@@ -101,25 +101,32 @@ However, in development, I still want to be able to use git to vary one subflake
 e.g. I want to be able to `git bisect` only one subflake.
 For this reason the subflake repositories are not remote but included in the parent flake.
 
-So my strategy is to create repositories in `./subflake-git` like `git init --bare` and then use them as the "remote".
-So the workflow to make a new subflake which is a nested repo is:
+So my strategy is to create repositories in `./subflake-git` like `git init --bare` and then use them as the "remote" for a git subtree around each flake.
+But they're just in the parent directory, so they're not actually remote at all.
+
+Setting up a new subflake goes something like this.
+Once I settle on a flow I may make a `subflake add` command 
 
 ```
-# create empty local repo
+# create empty local remote
 mkdir subflake-git/hello-foo
 cd subflake-git/hello-foo
-git init --bare
+git init --bare --initial-branch=main
 cd ../..
 
-# clone it for use as a subflake
-# but don't use `git clone` (that will give you an absolute path)
-mkdir hello-foo
+# the git subflake command dislikes empty remotes
+# so we'll clone it and populate it
+git clone subflake-git/hello-foo
 cd hello-foo
-git init
-git remote add local ../subflake-git/hello-foo
-# commit your files
-git push local main
+nix flake init
+git add . ; git commit -m "initial commit" ; git push origin main
+
+# remote the clone and add it back as a subtree
+cd ..
+rm -rf hello-foo
+git subtree add --prefix hello-foo subflake-git/hello-foo main
 ```
+
 I'm not sure if this is a good idea yet, trying it out...
 
 ## Warnings
