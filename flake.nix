@@ -9,8 +9,9 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    # Relative path input to sibling hello-rs flake
-    hello-rs.url = "path:../hello-rs";
+    # Source-only input - we just need the Rust code, not the flake outputs
+    hello-rs.url = "git+file:///Users/matt/src/hello-subflake/subflake-git/hello-rs?ref=main";
+    hello-rs.flake = false;
   };
 
   outputs = { self, nixpkgs, flake-utils, rust-overlay, hello-rs }:
@@ -31,13 +32,13 @@
           pname = "hello-wasm";
           version = "0.1.0";
 
-          # Create source with hello-rs included
+          # Create source with hello-rs included from non-flake input
           src = pkgs.runCommand "hello-wasm-src" {} ''
             mkdir -p $out
             cp -r ${./.}/* $out/
             chmod -R +w $out
             mkdir -p $out/hello-rs
-            cp -r ${../hello-rs}/* $out/hello-rs/
+            cp -r ${hello-rs}/* $out/hello-rs/
             # Update the Cargo.toml path to point to ./hello-rs instead of ../hello-rs
             sed -i 's|path = "../hello-rs"|path = "./hello-rs"|' $out/Cargo.toml
           '';
@@ -72,8 +73,6 @@
         packages = {
           default = helloWasmComponent;
           hello-wasm = helloWasmComponent;
-          # Re-export the Rust library from the subflake
-          hello-rs = hello-rs.packages.${system}.default;
         };
 
         checks = {
