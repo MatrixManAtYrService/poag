@@ -145,5 +145,5 @@ Since each subflake has its own `flake.lock` it may be necessary to run `nix fla
 I've not decided if this is a bug or a feature.
 
 #### Absolute Paths
-This isse makes it awkward to use relative paths to indicate the local git repo's: https://github.com/NixOS/nix/issues/12281
+This issue makes it awkward to use relative paths to indicate the local git repo's: https://github.com/NixOS/nix/issues/12281
 Until it is fixed, these flakes are using absolute paths: `git:file:///Users/matt/src/hello-subflake/subflake-git`
