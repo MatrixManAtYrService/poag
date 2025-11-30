@@ -178,8 +178,7 @@
         };
 
         devShells.default = pkgs.mkShell {
-          buildInputs = with pkgs; [
-            testEnv
+          packages = with pkgs; [
             uv
             maturin
             cargo
@@ -188,8 +187,11 @@
             clippy
             rustfmt
           ];
+          buildInputs = [ testEnv ];
           shellHook = ''
             export REPO_ROOT=$(pwd)
+            # Use testEnv's Python which has hello-py installed
+            export PYTHONPATH="${testEnv}/${python.sitePackages}:$PYTHONPATH"
             echo "Development environment ready!"
             echo ""
             echo "hello-py wheel is installed in this environment"
