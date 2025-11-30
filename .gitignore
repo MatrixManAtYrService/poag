@@ -1,0 +1,29 @@
+.direnv/
+__pycache__
+stolon_logs/
+rhizome_logs/
+.serena/
+
+# Nix build results
+result
+result-*
+
+# Rust build outputs
+target/
+*.rlib
+*.rmeta
+*.d
+*.dylib
+*.so
+
+# Python build outputs
+dist/
+build/
+*.egg-info/
+*.whl
+.venv/
+venv/
+*.pyc
+
+# Development environment
+.envrc
