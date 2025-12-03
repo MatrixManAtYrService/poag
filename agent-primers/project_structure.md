@@ -494,6 +494,99 @@ cd hello-wasm
 
 The sibling structure ensures `hello-rs` isn't duplicated!
 
+## Integration Testing and Version Mixing Strategy
+
+### The Core Insight
+
+Subflakes enable a powerful debugging and testing strategy: **selectively varying component versions while holding others constant**. Instead of reverting the entire repository or using git bisect, we use **Nix flake input references** to mix and match versions of individual subflakes.
+
+### Control Variables vs Experimental Variables
+
+When investigating a bug or regression:
+- **Control variables**: Components held at a known-good version (or current version)
+- **Experimental variables**: Components varied through their git history to isolate the problem
+
+This is accomplished by overriding flake inputs to point to specific commits.
+
+### Example: Debugging a Regression in hello-fancy
+
+Suppose tests pass in commit `abc123` but fail in current `HEAD`. You can narrow down which subflake introduced the problem:
+
+#### Test 1: Pin hello-rs to old version
+
+```nix
+# Top-level flake.nix
+inputs = {
+  hello-rs.url = "git+file:///Users/matt/src/hello-subflakes?rev=abc123&dir=hello-rs";
+  hello-py = {
+    url = "path:./hello-py";
+    inputs.hello-rs.follows = "hello-rs";  # Use the pinned version
+  };
+};
+```
+
+Run tests. If they **pass**: the bug is in `hello-rs`. If they **fail**: continue investigating.
+
+#### Test 2: Pin hello-py to old version
+
+```nix
+# Top-level flake.nix
+inputs = {
+  # Use old hello-py (brings its own locked hello-rs)
+  hello-py.url = "git+file:///Users/matt/src/hello-subflakes?rev=abc123&dir=hello-py";
+};
+```
+
+Run tests. If they **pass**: the bug is in `hello-py`. If they **fail**: bug is in top-level code.
+
+#### Test 3: Mix old hello-py with new hello-rs
+
+```nix
+# Top-level flake.nix
+inputs = {
+  hello-rs.url = "path:./hello-rs";  # Current version
+  hello-py = {
+    url = "git+file:///Users/matt/src/hello-subflakes?rev=abc123&dir=hello-py";
+    inputs.hello-rs.follows = "hello-rs";  # Override with new version
+  };
+};
+```
+
+This tests an old component with a new dependency - a combination that may never have existed in git history.
+
+### Testing at Different Levels
+
+The flake dependency graph determines **where** to run tests:
+
+```
+hello-fancy (root)    → Slowest, most comprehensive tests
+    ↓
+hello-py (middle)     → Moderate tests, exercises FFI boundary
+    ↓
+hello-rs (leaf)       → Fastest tests, minimal dependencies
+```
+
+**Strategy**:
+- Start testing at the **leaf nodes** (fast feedback)
+- Move up the tree only if needed (more context, slower tests)
+- The smallest test that reproduces the bug is the best test
+
+### Benefits of This Approach
+
+✅ **Surgical precision**: Change only what you need to investigate
+✅ **Efficient caching**: Nix reuses builds for unchanged components
+✅ **Test impossible combinations**: Mix versions that never coexisted in git history
+✅ **No git history pollution**: No need to check out old commits or manipulate git state
+✅ **Parallel investigation**: Can test multiple hypotheses by varying different inputs
+
+### After Finding the Bug
+
+Once you've identified the problematic component and commit:
+1. Use `git log` on that subflake directory to find the specific change
+2. Review the diff for that commit
+3. Fix the bug in the current code
+4. Verify the fix by running tests with all components at current versions
+
 ## Troubleshooting
 
 ### "Cannot find hello-rs"

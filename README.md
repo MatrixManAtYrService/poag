@@ -84,6 +84,51 @@ I may have been similarly dazzled once or twice myself.
 I also think it creates interesting opportunities for making conglomerations of heterogeneous technology feel like a single thing.
 Which might be good or bad, depending on how you feel about remixes.
 
+## Integration Testing and Version Mixing
+
+One of the key benefits of using subflakes is the ability to **mix and match versions** of different components for integration testing and debugging.
+Rather than reverting the entire repository, we use **Nix flake input references** to control which version of each subflake is consumed by which other subflake.
+
+### The Strategy
+
+When you need to test different combinations of component versions (e.g., to find a regression or validate a release), you can be selective about which code to hold constant (control variables) and which code to vary (experimental variables).
+
+### Example: Finding a Regression
+
+Suppose you discover a bug in the current version.
+You can test whether it exists in an older version of `hello-rs` without reverting the entire codebase:
+
+```nix
+# In the top-level flake.nix
+inputs = {
+  # Override to use hello-rs from a specific commit
+  hello-rs.url = "git+file:///path/to/repo?rev=abc123&dir=hello-rs";
+
+  # Make hello-py use this pinned version
+  hello-py = {
+    url = "path:./hello-py";
+    inputs.hello-rs.follows = "hello-rs";
+  };
+};
+```
+
+Or test whether the bug is in `hello-py` by pinning just that component:
+
+```nix
+inputs = {
+  # Use old hello-py (which will pull in its locked hello-rs version)
+  hello-py.url = "git+file:///path/to/repo?rev=def456&dir=hello-py";
+};
+```
+
+This approach lets you:
+- **Hold some components constant** at current/working versions (control variables)
+- **Vary other components** through their history to isolate problems (experimental variables)
+- **Test combinations** that may never have existed together in a single commit
+- **Take advantage of Nix caching** - unchanged components don't rebuild
+- **Run new tests agains old code** - unlike git bisect, we can be targeted about which subflake gets the old version
+
+
 ## Subflakes
 
 ```
