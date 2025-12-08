@@ -7,46 +7,37 @@
 
 ![A goat, on a pogo stick, hopping along a path made of nix flakes](./poag.png)
 
-Goal:
+**Goal**
 
 Humans should spend less time (and fewer tokens) when describing context to LLMs.
 
-Observations:
+**Observations**
 
-1. AI is good at small focused projects, and less good at large multifaceted ones.
+1. AI is good at small focused projects, it's less good at large multifaceted ones.
 2. nix flakes are a way to build graphs out of small focused projects
+3. the relationships used to resolve dependencies in a graph of nix flakes, can be reused to prepare a corresponding graph of AI agents.
 
-Hypothesis:
+**Hypothesis**
 
-Instead of teaching a single AI to understand how a graph of small projects interact, it might be better consult a graph of AI's wich already understand how they relate to their neighbors in the dependency graph formed by the flake input/outpus.
+Developers who are guided by this graph of agents will be more efficient than they would be on their own.
+In the long run, these efficiencies will offset the cost of maintaining the agent graph.
 
 `poag` is a tool for doing this.
 
-It creates a 1:1 correspondence between product owner agents and nix flakes.
-The structure created by flake inputs/outputs are used as cues to indicate requrements.
+The structure created by flake inputs/outputs are used as cues toward requrement discovery.
 For each agent, it goes like this:
 
 > My flake's inputs indicate topics and point me at other agents that can help me with those topics
-> My flake's outputs indicate topics which I am expected to be an expert on, consumers of those outputs may need my help with them.
+> My flake's outputs indicate topics which I am expected to be an expert on, consumers of those outputs may ask me for help with them.
 
 This greates a social structure which agents use to deide whether they should delegate a request, handle it themselves, or handle part of it and delegate other parts.
-
-The strategy is scatter/gather:
-
-- receive a question from some human or some agent
-- decide if I'm the right agent to answer it
-- if not, decide which of the agents that support me are most likley to know
-- ask the experts, possibly by decomposing the question into different parts for different experts
-- consume the responses, potentially iterating a few times until the goal is reached
-- synthesize a cohesive answer and feed it back to whichever agent asked you the question
 
 ### Product Owners?
 
 If a developer is working on changes that interact across multiple projects, their mind is likely to be full of fragments of context for multiple projects.
 It's not clear how reusable this context is, since it's focused on their current journey and tomorrow's journey might be a different one.
 
-Product Owners, however, are permitted to focus on the thing that they own.
-If a situation demands expertise on an adjacent product, they can refer inquiries to the appropriate owner.
+Product Owners, however, are permitted to stay focused on what that they own.
 It's a persona which is more compatible with the optimization that I'm trying to achieve here.
 
 Expected use cases:
@@ -63,7 +54,7 @@ I'll say something like:
 > Make it ask "are you sure?" on logout and close any active sessions when this happens.
 
 The various experts will chat about my request.
-When they're in agreement about the pan, I'll get something like this:
+When they're in agreement about the plan, I'll get something like this:
 
 ```json
 {
@@ -95,7 +86,7 @@ When they're in agreement about the pan, I'll get something like this:
   ]
 }
 ```
-I can then feed this to my coding agent and supervise the process.
+I can then feed this to my coding agent and supervise the work.
 
 ## Why?
 
