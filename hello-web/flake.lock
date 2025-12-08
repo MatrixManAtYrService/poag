@@ -61,18 +61,18 @@
         "rust-overlay": "rust-overlay"
       },
       "locked": {
-        "lastModified": 1764518795,
-        "narHash": "sha256-MQSnOCqnbC/0TZ5YjlYIE7akbMB61A6TvL75qWIOeT0=",
+        "lastModified": 1764520779,
+        "narHash": "sha256-mCAKhFw6daNa4fjiZ8F3B0ZfE0lFlAJN1Yt4lowfH4k=",
         "ref": "main",
-        "rev": "f53107fe89f4e8193adb8a2e7397649309926185",
-        "revCount": 2,
+        "rev": "a128896d5f037c7b4aafda777613e89004234618",
+        "revCount": 3,
         "type": "git",
-        "url": "file:///Users/matt/src/hello-subflake/subflake-git/hello-wasm"
+        "url": "file:///Users/matt/src/hello-subflakes/subflake-git/hello-wasm"
       },
       "original": {
         "ref": "main",
         "type": "git",
-        "url": "file:///Users/matt/src/hello-subflake/subflake-git/hello-wasm"
+        "url": "file:///Users/matt/src/hello-subflakes/subflake-git/hello-wasm"
       }
     },
     "nixpkgs": {

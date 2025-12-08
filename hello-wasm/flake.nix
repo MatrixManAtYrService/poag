@@ -12,9 +12,14 @@
     # Source-only input - we just need the Rust code, not the flake outputs
     hello-rs.url = "git+file:///Users/matt/src/hello-subflakes/subflake-git/hello-rs?ref=main";
     hello-rs.flake = false;
+
+    poag = {
+      url = "path:../poag";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { self, nixpkgs, flake-utils, rust-overlay, hello-rs }:
+  outputs = { self, nixpkgs, flake-utils, rust-overlay, hello-rs, poag }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         overlays = [ rust-overlay.overlays.default ];
@@ -211,6 +216,7 @@ EOF
             wasm-tools
             wasmtime
             binaryen
+            poag.packages.${system}.default
           ];
 
           shellHook = ''

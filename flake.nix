@@ -11,6 +11,12 @@
     # Git input to hello-web local repository
     hello-web.url = "git+file:///Users/matt/src/hello-subflakes/subflake-git/hello-web?ref=main";
 
+    # POAG for agent orchestration and discovery tools
+    poag = {
+      url = "path:./poag";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     pyproject-nix = {
       url = "github:pyproject-nix/pyproject.nix";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -32,7 +38,7 @@
     };
   };
 
-  outputs = { self, nixpkgs, flake-utils, uv2nix, pyproject-nix, pyproject-build-systems, hello-py, hello-web }:
+  outputs = { self, nixpkgs, flake-utils, uv2nix, pyproject-nix, pyproject-build-systems, hello-py, hello-web, poag }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs {
@@ -138,6 +144,8 @@
             # Docker tools (client only, no daemon)
             docker-compose
             docker-client
+            # POAG for agent orchestration
+            poag.packages.${system}.default
           ];
           env = {
             UV_PYTHON = python.interpreter;
@@ -170,6 +178,10 @@
             echo ""
             echo "Development environment ready!"
             echo "hello-py is provided via Nix overlay from the subflake"
+            echo ""
+            echo "POAG agent orchestration:"
+            echo "  poag ls              # List all subflakes"
+            echo "  poag plan 'request'  # Generate development plan"
             echo ""
             echo "To run tests:"
             echo "  pytest tests/    # Requires container runtime (Docker/Podman/colima/OrbStack)"

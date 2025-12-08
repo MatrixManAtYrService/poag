@@ -1,153 +1,137 @@
-# Hello Subflakes
+# poag
 
-By "subflake" I mean:
+**P**roduct
+**O**wner
+**A**gent
+**G**raph
 
-> A nix flake whose `(great)*(grand)?parent` directory is also a flake
+[A goat, on a pogo stick, hopping along a path made of nix flakes](./poag.png)
 
-Subflakes behavior was [improved as of nix 2.4](https://github.com/NixOS/nix/pull/10089) (Feburary 2024).
-Here I'm exploring how they can be useful.
+Observations:
 
-This README is focused on what I managed to make it do.
-For a simplified example describing **why** you might want to arrange your code like this, see [this gist](https://gist.github.com/MatrixManAtYrService/6eaf50373448c0bc14acca31d69591b9)
+1. AI is good at small focused projects, and less good at large multifaceted ones.
+2. nix flakes are a way to build graphs out of small focused projects
 
+Hypothesis:
 
-## Outer/Parent/Super Flake Functionality
+Instead of teaching a single AI to understand how a graph of small projects interact, it might be better consult a graph of product-owner AI's wich already understand how they relate to their neighbors in the dependency graph.
 
-You're looking at the README for the outer flake.
-It provides a CLI app called "hello-fancy".
+`poag` is a tool for doing this.
+The goal is to spend less time describing context, because you're connected to a community of experts which already have context.
+Ideally, the flake structure provides enough cues for agents to understand how their specialty fits in to the larger picture.
 
+This is a graph of product owners.
+If you supply a prompt at a node it will gossip with its children (projects that it depends on).
+
+Expected use cases:
+
+- asking usage questions
+- fixing bugs that span multpile flakes
+- implementing features that require coordination across multiple flakes
+
+Mostly, I anticipate using it to add context to prompts.
+I'll say something like:
+
+> Make it ask "are you sure?" on logout and close any active sessions when this happens.
+
+The various experts will chat about my request.
+When they're in agreement about the pan, I'll get something like this:
+
+```json
+{
+  "subflakes": {
+    "foo-ui" : {
+       "./some/test.js": "modify this to check if the question gets asked, currently just makes assertions about the button",
+       "./some/component.js": "there is an on_exit event handler you can hook into here, be sure to not call exited() until after everything else is done"
+     },
+     "foo-server": {
+       "./some/api.rs": "Add the on_exit api here",
+       "./some/controller.rs": "session handling is in this file, you'll have to add some way to alter all sessions at once",
+       "./tests/session_finish.rs": "there are no tests regarding session lifetime, but that should change, add one here"
+     },
+     "foo-event-listener": {
+       "./event_parsing.py": "There's an enum in here that you'll have to update so that telemetry categorizes the new event appropriately"
+     },
+     "foo-uat": {
+       "./tests": "There are several user acceptance tests in here, don't break them, and add one when you're done"
+     }
+  },
+  "plan": [
+    "Create a feature branch",
+    "Run `nix flake check` in ./foo-ui, ./foo-server, and ./foo-uat just to be sure that you're starting with a clean bill of health",
+    "Make the changes to foo-server, your new test should pass, add the changes in that flake to a commit",
+    "Make the changes to foo-ui, your updated test should now pass, add the changes in that flake to a second commit",
+    "Add the new user acceptance test and the new event enum in the event listener, ensure the test passes, also run `pyright` in the event listener flake, if it's clean, add both of these to a third commit",
+    "Run ./generate_docs.sh in the root flake, create a commit with the updates that it makes (I hope you have good docstrings on your new code)",
+    "Create a PR with these four commits and mark it merge-ready",
+  ]
+}
 ```
-❯ hello-fancy world
-Hello World! 
-```
+I can then feed this to my coding agent and supervise the process.
 
-The fancy part is that it's uppercase with a bang! 🧐
+## Why?
 
-Unlike your typical hello-world, "world" was appended to "hello" by...
+For large projects, it's not practical a single agent to have a complete picture of the code in their context window because then there's not enough headroom for actually doing the job.
 
-- a rust library (`hello-rs` subflake),
-- which was embedded in a python library (`hello-py` subflake),
-- which was imported by a python application (outer flake, `hello-fancy` app).
+### Many Partial Contexts, one Context Window
 
+One approach is to instruct the agent to explore the project and come up with a plan.
+In the example above they'd end up with partial knowledge of four subflakes.
+Later, if I wanted another change made, It might still require partial knowledge of four subflakes, but it might need to be knowledge of different parts.
 
-There's also a flake output `hello-web` which does something similar in a browser:
+This is wasteful because each set of partial knowledges is specific to the prompt, so it's not worth re-using for the next prompt.
+This puts us in a mode where all context is use-once-and-forget.
 
-```
-❯ nix build .#hello-web
-❯ python -m http.server --directory result
-Serving HTTP on :: port 8000 (http://[::]:8000/) ...
-```
-![screenshot of a web browser, a button click has transformed "world" into "Hello World!"](./hello-web.png)
+### Many Agents With "full" Context
 
-In this case "world" was appended to "hello" by...
-- a rust library (`hello-rs` subflake),
-- which was compiled to a WASM [component](https://component-model.bytecodealliance.org/) (`hello-wasm` subflake),
-- which was transpiled and set up for browser use (`hello-web` subflake).
+In the above example, it might be somewhat costly to crate four experts and provide them with enough context to set the stage for gossip between them.
+But, once they have mastery of their flake and they understand what they require of their neighbors (and what their neighbors require of them), we can make conversation checkpoints.
+At that point, they can be consulted, rewound, and consulted again--one can rely on their expertise multiple times without repaying the cost of developing that expertise.
 
-So in addition to makeing a complex DAG out of flake-based projects, those projects can themselve be a complex DAG of dependencies.
-What fun!
+As the project changes, they'll still need to be updated about those changes, but by not forcing them to wear multiple hats, their context remains pure and they retain some of the magic that we see in demo's where LLM's code impressive things from scratch.
+The developer agent, who consumes their directions, will not exhibit that magic, since it must span multiple contexts.
+Unlike the product owners, its context will not be reused, but it's my hypothesis that it will benefit from the product owner recommendations and will need fewer tokens to get its job done.
 
-## Outer/Parent/Super Flake Testing of Subflakes
+At a certain point, the reduced needs of the developer (who doesn't recycle context) will outweigh the increased needs of the product owners (who do recycle context).
 
-You can also run `pytest` from the outer devshell:
-```
-❯ pytest -v
-============================ test session starts =============================
-tests/test_hello_py.py::test_hello_py_pytest_check PASSED              [ 11%]
-tests/test_hello_py.py::test_hello_py_import_smoke_test PASSED         [ 22%]
-tests/test_hello_rs.py::test_hello_rs_cargo_test_check PASSED          [ 33%]
-tests/test_hello_rs.py::test_hello_rs_library_smoke_test PASSED        [ 44%]
-tests/test_hello_wasm.py::test_hello_wasm_wasmtime_check PASSED        [ 55%]
-tests/test_hello_wasm.py::test_hello_wasm_component_smoke_test PASSED  [ 66%]
-tests/test_hello_web.py::test_hello_world_greeting PASSED              [ 77%]
-tests/test_hello_web.py::test_empty_input_validation PASSED            [ 88%]
-tests/test_hello_web.py::test_multiple_names PASSED                    [100%]
-============================= 9 passed in 10.00s =============================
-```
+### Widespread Use
 
-This integrates with the subflakes in a variety of ways.
-The idea is that each subflake can test itself according to whatever is idiomatic for the code contained therein, and here at the top level we can just extract results--relying on nix to give us cached results (and to invalidate that cache appropriately).
+So far as I'm aware, Anthropic doesn't allow me to make my claude code conversation checkpoints public.
+But imagine if we could.
+Then the same experts that have been helping us while coding, could also be referenced by our users.
+It would probably be less wasteful than having the users separately populate the context windows of their own LLM's for single use.
 
-I put python at the top level just because it is most familliar for me.
+### Anthropic Only... For Now
 
-## It's about Ignorance
+If I can make it useful for claude code, I'll later split out modules for the various other cli AI tools.
+I chose claude code because its cli seems to be the most mature.
+Hopefully the others will catch up.
 
-When I'm working at the top level I want to be able to **ignore** the tech stacks of each subflake, more or less just operating on their outputs and relying on nix to cach or rebuild those outputs as appropriate.
-Similarly, when I'm working in a subflake I want to be able to ignore the bigger picture, focusing only on that flake's outputs.
+The current architecture is [langgraph](https://github.com/langchain-ai/langgraph) around headless claude code sessions, each of which runs in the default nix devshell for the flake that it owns.
+These devshells all need to have the `poag` command, which those headless claudes will be prompted to use.
 
-For this reason `cargo` and `wasmtime` are not available in the outer flake devshell, and `python` and `pytest` are not available in (most of the) inner flake devshells.
-There are multiple python environments, but they're isolated to different flakes, so for better or worse we're well prepared to depend on different versions of the same python package in different parts of our project.
+## Nix Subflakes
 
-I anticipate that this context-limiting will be useful for preventing LLMs being dazzled by multiple overlapping tech stacks.
-I may have been similarly dazzled once or twice myself.
+One half of this project is a copy of [hello-subflakes](https://github.com/MatrixManAtYrService/hello-subflakes):
 
-I also think it creates interesting opportunities for making conglomerations of heterogeneous technology feel like a single thing.
-Which might be good or bad, depending on how you feel about remixes.
+- hello-py
+- hello-rs
+- hello-wasm
+- hello web
 
-## Integration Testing and Version Mixing
+It's a fancy hello world involving a Rust/Python FFI, compiling Rust to WASM, and then testing the rust-written functionality both via a browser and also via a python library.
+It's not useful for anything, but it's a good playground for the other half of this project.
 
-One of the key benefits of using subflakes is the ability to **mix and match versions** of different components for integration testing and debugging.
-Rather than reverting the entire repository, we use **Nix flake input references** to control which version of each subflake is consumed by which other subflake.
+## `poag` CLI
 
-### The Strategy
+There are a few more subflakes which are part of the poag project
 
-When you need to test different combinations of component versions (e.g., to find a regression or validate a release), you can be selective about which code to hold constant (control variables) and which code to vary (experimental variables).
+- poag  (the CLI entrypoint)
+  - poag-api (the openapi spec for `poag serve`)
+  - poag-server (the poag server)
+  - poag-client (the poag python client, used by the CLI)
+  - poag-ui (the poag front end)
 
-### Example: Finding a Regression
+When it's mature, `poag` will be all alone in a repo, ready to be used as a flake input wherever it's needed.
+Since it's experimental, it's currently packaged together with this subflake playground so that it has something to operate on.
 
-Suppose you discover a bug in the current version.
-You can test whether it exists in an older version of `hello-rs` without reverting the entire codebase:
-
-```nix
-# In the top-level flake.nix
-inputs = {
-  # Override to use hello-rs from a specific commit
-  hello-rs.url = "git+file:///path/to/repo?rev=abc123&dir=hello-rs";
-
-  # Make hello-py use this pinned version
-  hello-py = {
-    url = "path:./hello-py";
-    inputs.hello-rs.follows = "hello-rs";
-  };
-};
-```
-
-Or test whether the bug is in `hello-py` by pinning just that component:
-
-```nix
-inputs = {
-  # Use old hello-py (which will pull in its locked hello-rs version)
-  hello-py.url = "git+file:///path/to/repo?rev=def456&dir=hello-py";
-};
-```
-
-This approach lets you:
-- **Hold some components constant** at current/working versions (control variables)
-- **Vary other components** through their history to isolate problems (experimental variables)
-- **Test combinations** that may never have existed together in a single commit
-- **Take advantage of Nix caching** - unchanged components don't rebuild
-- **Run new tests agains old code** - unlike git bisect, we can be targeted about which subflake gets the old version
-
-
-## Subflakes
-
-```
-├── hello-rs/          # Core Rust library
-├── hello-py/          # Python bindings (PyO3/Maturin)
-├── hello-wasm/        # WebAssembly Component (WASI 0.2)
-└── hello-web/         # Browser application
-```
-
-## Warnings
-
-#### AI Disclaimer
-Although I believe that my tests prove the concept reasonably well, there's a lot of LLM-generated code here.
-Think twice before assuming that you're not looking at insanity.
-
-#### Experimental
-It seems like a workable arrangement, but I'm sure there are undiscovered gotchas.
-I'll try to document them here as I explore.
-
-#### Cache Complexity
-Since each subflake has its own `flake.lock` it may be necessary to run `nix flake update` more often than you'd expect.
-I've not decided if this is a bug or a feature.

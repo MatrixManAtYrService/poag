@@ -7,9 +7,14 @@
 
     # Git input to hello-wasm local repository
     hello-wasm.url = "git+file:///Users/matt/src/hello-subflakes/subflake-git/hello-wasm?ref=main";
+
+    poag = {
+      url = "path:../poag";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { self, nixpkgs, flake-utils, hello-wasm }:
+  outputs = { self, nixpkgs, flake-utils, hello-wasm, poag }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs {
@@ -81,6 +86,7 @@
             nodejs
             nodePackages.npm
             python3
+            poag.packages.${system}.default
           ];
 
           shellHook = ''

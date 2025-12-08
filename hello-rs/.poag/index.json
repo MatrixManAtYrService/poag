@@ -1,0 +1,10 @@
+{
+  "last_commit": "d32b701e3269dc6c27937af85c1975a54e8edd2b",
+  "contracts": {
+    "inputs": [],
+    "outputs": [
+      "hello-py.md",
+      "hello-wasm.md"
+    ]
+  }
+}

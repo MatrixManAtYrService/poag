@@ -10,9 +10,13 @@
       flake = false;
     };
 
+    poag = {
+      url = "path:../poag";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { self, nixpkgs, flake-utils, hello-rs}:
+  outputs = { self, nixpkgs, flake-utils, hello-rs, poag }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs {
@@ -187,7 +191,10 @@
             clippy
             rustfmt
           ];
-          buildInputs = [ testEnv ];
+          buildInputs = [
+            testEnv
+            poag.packages.${system}.default
+          ];
           shellHook = ''
             export REPO_ROOT=$(pwd)
             # Use testEnv's Python which has hello-py installed

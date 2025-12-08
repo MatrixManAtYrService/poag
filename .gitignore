@@ -26,4 +26,4 @@ venv/
 *.pyc
 
 # Development environment
-.envrc
+.envrc.local
