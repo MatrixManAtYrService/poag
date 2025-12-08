@@ -7,6 +7,10 @@
 
 ![A goat, on a pogo stick, hopping along a path made of nix flakes](./poag.png)
 
+Goal:
+
+Humans should spend less time (and fewer tokens) when describing context to LLMs.
+
 Observations:
 
 1. AI is good at small focused projects, and less good at large multifaceted ones.
@@ -14,11 +18,27 @@ Observations:
 
 Hypothesis:
 
-Instead of teaching a single AI to understand how a graph of small projects interact, it might be better consult a graph of product-owner AI's wich already understand how they relate to their neighbors in the dependency graph.
+Instead of teaching a single AI to understand how a graph of small projects interact, it might be better consult a graph of AI's wich already understand how they relate to their neighbors in the dependency graph formed by the flake input/outpus.
 
 `poag` is a tool for doing this.
-The goal is to spend less time describing context, because you're connected to a community of experts which already have context.
-Ideally, the flake structure provides enough cues for agents to understand how their specialty fits in to the larger picture.
+
+It creates a 1:1 correspondence between product owner agents and nix flakes.
+The structure created by flake inputs/outputs are used as cues to indicate requrements.
+For each agent, it goes like this:
+
+> My flake's inputs indicate topics and point me at other agents that can help me with those topics
+> My flake's outputs indicate topics which I am expected to be an expert on, consumers of those outputs may need my help with them.
+
+This greates a social structure which agents use to deide whether they should delegate a request, handle it themselves, or handle part of it and delegate other parts.
+
+The strategy is scatter/gather:
+
+- receive a question from some human or some agent
+- decide if I'm the right agent to answer it
+- if not, decide which of the agents that support me are most likley to know
+- ask the experts, possibly by decomposing the question into different parts for different experts
+- consume the responses, potentially iterating a few times until the goal is reached
+- synthesize a cohesive answer and feed it back to whichever agent asked you the question
 
 ### Product Owners?
 
