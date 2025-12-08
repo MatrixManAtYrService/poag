@@ -20,14 +20,22 @@ Instead of teaching a single AI to understand how a graph of small projects inte
 The goal is to spend less time describing context, because you're connected to a community of experts which already have context.
 Ideally, the flake structure provides enough cues for agents to understand how their specialty fits in to the larger picture.
 
-This is a graph of product owners.
-If you supply a prompt at a node it will gossip with its children (projects that it depends on).
+### Product Owners?
+
+If a developer is working on changes that interact across multiple projects, their mind is likely to be full of fragments of context for multiple projects.
+It's not clear how reusable this context is, since it's focused on their current journey and tomorrow's journey might be a different one.
+
+Product Owners, however, are permitted to focus on the thing that they own.
+If a situation demands expertise on an adjacent product, they can refer inquiries to the appropriate owner.
+It's a persona which is more compatible with the optimization that I'm trying to achieve here.
 
 Expected use cases:
 
 - asking usage questions
 - fixing bugs that span multpile flakes
 - implementing features that require coordination across multiple flakes
+
+### An Example
 
 Mostly, I anticipate using it to add context to prompts.
 I'll say something like:
