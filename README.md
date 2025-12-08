@@ -28,6 +28,7 @@ The structure created by flake inputs/outputs are used as cues toward requrement
 For each agent, it goes like this:
 
 > My flake's inputs indicate topics and point me at other agents that can help me with those topics
+>
 > My flake's outputs indicate topics which I am expected to be an expert on, consumers of those outputs may ask me for help with them.
 
 This greates a social structure which agents use to deide whether they should delegate a request, handle it themselves, or handle part of it and delegate other parts.
