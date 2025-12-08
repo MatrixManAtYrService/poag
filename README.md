@@ -5,7 +5,7 @@
 **A**gent
 **G**raph
 
-[A goat, on a pogo stick, hopping along a path made of nix flakes](./poag.png)
+![A goat, on a pogo stick, hopping along a path made of nix flakes](./poag.png)
 
 Observations:
 
