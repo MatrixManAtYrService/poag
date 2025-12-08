@@ -14,12 +14,12 @@ Humans should spend less time (and fewer tokens) when describing context to LLMs
 **Observations**
 
 1. AI is good at small focused projects, it's less good at large multifaceted ones.
-2. nix flakes are a way to build graphs out of small focused projects
-3. the relationships used to resolve dependencies in a graph of nix flakes, can be reused to prepare a corresponding graph of AI agents.
+2. Nix flakes are a way to build graphs out of small focused projects.
+3. The input/output relationships between flakes can be associated with to user/maintainer relationshps between product owner agents which allows us to make a graph of product owner agents that is homomorphic to the graph of flakes.
 
 **Hypothesis**
 
-Developers who are guided by this graph of agents will be more efficient than they would be on their own.
+Developer agents that consult the graph of product owner agents will be more efficient than they would be on their own.
 In the long run, these efficiencies will offset the cost of maintaining the agent graph.
 
 `poag` is a tool for doing this.
@@ -31,11 +31,13 @@ For each agent, it goes like this:
 >
 > My flake's outputs point me at other agents that may ask for my help with whatever my flake writes to that ouput
 
-This greates a social structure which agents use to deide whether they should delegate a request, handle it themselves, or handle part of it and delegate other parts.
+This greates a social structure which agents use to decide whether they should delegate a request, handle it themselves, or handle part of it and delegate other parts.
+This lends itself to a scatter/gather approach where product owners contribute knowledge that matches their expertise, and know who to ask for knowledge that doesn't.
+We're re-using the package dependency tree as a knowledge graph.
 
 ### Product Owners?
 
-If a developer is working on changes that interact across multiple projects, their mind is likely to be full of fragments of context for multiple projects.
+If a developer is working on changes that interact across multiple projects, their mind is likely to be full of fragments of context for those projects.
 It's not clear how reusable this context is, since it's focused on their current journey and tomorrow's journey might be a different one.
 
 Product Owners, however, are permitted to stay focused on what that they own.
@@ -50,7 +52,7 @@ Expected use cases:
 ### An Example
 
 Mostly, I anticipate using it to add context to prompts.
-I'll say something like:
+I'll send `poag` a prompt like:
 
 > Make it ask "are you sure?" on logout and close any active sessions when this happens.
 
