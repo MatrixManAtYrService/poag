@@ -7,7 +7,7 @@
 
 > Organizations which design systems are constrained to produce designs which are copies of the communication structures of those organizations.
 
-Melvin Conway , 1967
+-- Melvin Conway , 1967
 
 `poag` sees the design of a system as a set of nix flakes connected by inputs and outputs.
 It creates a corresponding graph of AI product owners whose comunication graph is homomorphic to the flake graph.
