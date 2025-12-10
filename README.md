@@ -6,6 +6,7 @@
 **G**raph
 
 > Organizations which design systems are constrained to produce designs which are copies of the communication structures of those organizations.
+
 Melvin Conway , 1967
 
 `poag` sees the design of a system as a set of nix flakes connected by inputs and outputs.
