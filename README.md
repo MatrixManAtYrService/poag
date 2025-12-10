@@ -5,32 +5,38 @@
 
 # poag: **P**roduct **O**wner **A**gent **G**raph
 
+![A goat, on a pogo stick, hopping along a path made of nix flakes](./poag.png)
+
 `poag` looks for nix flakes and understands system design in terms of their inputs and outputs.
 It creates a corresponding graph of AI product owners whose comunication graph is homomorphic to the flake graph.
 Developers (or their agents) can use the various `poag` subcommands to communicate with the agent graph.
 
-A poag can:
+Each agent in the poag can:
+- delegate qto the appropriate specialist
 - plan changes
 - answer questions about...
   - how to use the software
   - the status of in progress or planned changes
-- delegate questions to the appropriate specialist (this is especially helpful if the project is too large to fit into the context window of a single AI agent).
 
+Having more than one agent for these things is anticipated to be especially helpful when the project complexity exceeds what can fit in a single agent's context window.
 
+## Adjacent Agents
 
-![A goat, on a pogo stick, hopping along a path made of nix flakes](./poag.png)
+Each agent in the poag thinks of its peers as either a producer or consumer of support:
 
-For each agent in the poag, it goes like this:
+| flake relationship | agent relationship |
+| :--: | :-- |
+| input | Their developers support us by changing the contents of this input |
+| output | Our developer support them by changing the contents of this output | 
 
-> My flake's inputs point me at other agents that can help me with whatever my flake receives from that input
->
-> My flake's outputs point me at other agents that may ask for my help with whatever my flake writes to that ouput
+This greates a social graph which agents use to decide whether they should delegate a request, handle it themselves, or handle part of it and delegate other parts.
 
-This greates a social structure which agents use to decide whether they should delegate a request, handle it themselves, or handle part of it and delegate other parts.
-This lends itself to a scatter/gather approach where product owners contribute knowledge that matches their expertise, and know who to ask for knowledge that doesn't.
+Humans can interact with any agent in the poag by running `poag` subcommands in the associated flake's devshell.
+The corresponding agent will implement a scatter/gather approach where product owners contribute knowledge that matches their expertise, and know who to ask for knowledge that doesn't.
 
-It's a little like using the package dependency tree as an indext to a knowledge graph.
-You have to maintain your dependency tree anyway, maybe that structure will be useful for this also.
+If you're uncertain, ask the root owner, it will find the appropriate owner for your query.
+To be more targeted, instead act closer to the leaves of the dependency dag.
+
 
 ### Product Owners?
 
@@ -106,22 +112,6 @@ The developer agent, who consumes their directions, will not exhibit that magic,
 Unlike the product owners, its context will not be reused, but it's my hypothesis that it will benefit from the product owner recommendations and will need fewer tokens to get its job done.
 
 At a certain point, the reduced needs of the developer (who doesn't recycle context) will outweigh the increased needs of the product owners (who do recycle context).
-
-### Widespread Use
-
-So far as I'm aware, Anthropic doesn't allow me to make my claude code conversation checkpoints public.
-But imagine if we could.
-Then the same experts that have been helping us while coding, could also be referenced by our users.
-It would probably be less wasteful than having the users separately populate the context windows of their own LLM's for single use.
-
-### Anthropic Only... For Now
-
-If I can make it useful for claude code, I'll later split out modules for the various other cli AI tools.
-I chose claude code because its cli seems to be the most mature.
-Hopefully the others will catch up.
-
-The current architecture is [langgraph](https://github.com/langchain-ai/langgraph) around headless claude code sessions, each of which runs in the default nix devshell for the flake that it owns.
-These devshells all need to have the `poag` command, which those headless claudes will be prompted to use.
 
 ## Nix Subflakes
 
