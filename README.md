@@ -84,7 +84,7 @@ I can then feed this to my coding agent and supervise the work.
 
 ## Why?
 
-For large projects, it's not practical a single agent to have a complete picture of the code in their context window because then there's not enough headroom for actually doing the job.
+For large projects, it's not practical to expect a single agent to have a complete picture of the code in their context window because then there's not enough headroom for actually doing the job.
 
 ### Many Partial Contexts, one Context Window
 
