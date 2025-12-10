@@ -12,7 +12,7 @@ It creates a corresponding graph of AI product owners whose comunication graph i
 Developers (or their agents) can use the various `poag` subcommands to communicate with the agent graph.
 
 Each agent in the poag can:
-- delegate qto the appropriate specialist
+- delegate to the appropriate specialist
 - plan changes
 - answer questions about...
   - how to use the software
