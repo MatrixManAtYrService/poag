@@ -5,31 +5,22 @@
 
 # poag: **P**roduct **O**wner **A**gent **G**raph
 
-`poag` sees the design of a system as a set of nix flakes connected by inputs and outputs.
+`poag` looks for nix flakes and understands system design in terms of their inputs and outputs.
 It creates a corresponding graph of AI product owners whose comunication graph is homomorphic to the flake graph.
 Developers (or their agents) can use the various `poag` subcommands to communicate with the agent graph.
 
+A poag can:
+- plan changes
+- answer questions about...
+  - how to use the software
+  - the status of in progress or planned changes
+- delegate questions to the appropriate specialist (this is especially helpful if the project is too large to fit into the context window of a single AI agent).
+
+
+
 ![A goat, on a pogo stick, hopping along a path made of nix flakes](./poag.png)
 
-**Goal**
-
-Humans should spend less time (and fewer tokens) when describing context to LLMs.
-
-**Observations**
-
-1. AI is good at small focused projects, it's less good at large multifaceted ones.
-2. Nix flakes are a way to build graphs out of small focused projects.
-3. The input/output relationships between flakes can be associated with to user/maintainer relationshps between product owner agents which allows us to make a graph of product owner agents that is homomorphic to the graph of flakes.
-
-**Hypothesis**
-
-Developer agents that consult the graph of product owner agents will be more efficient than they would be on their own.
-In the long run, these efficiencies will offset the cost of maintaining the agent graph.
-
-`poag` is a tool for doing this.
-
-The structure created by flake inputs/outputs are used as cues toward requrement discovery.
-For each agent, it goes like this:
+For each agent in the poag, it goes like this:
 
 > My flake's inputs point me at other agents that can help me with whatever my flake receives from that input
 >
@@ -37,21 +28,17 @@ For each agent, it goes like this:
 
 This greates a social structure which agents use to decide whether they should delegate a request, handle it themselves, or handle part of it and delegate other parts.
 This lends itself to a scatter/gather approach where product owners contribute knowledge that matches their expertise, and know who to ask for knowledge that doesn't.
-We're re-using the package dependency tree as a knowledge graph.
+
+It's a little like using the package dependency tree as an indext to a knowledge graph.
+You have to maintain your dependency tree anyway, maybe that structure will be useful for this also.
 
 ### Product Owners?
 
 If a developer is working on changes that interact across multiple projects, their mind is likely to be full of fragments of context for those projects.
 It's not clear how reusable this context is, since it's focused on their current journey and tomorrow's journey might be a different one.
 
-Product Owners, however, are permitted to stay focused on what that they own.
-It's a persona which is more compatible with the optimization that I'm trying to achieve here.
-
-Expected use cases:
-
-- asking usage questions
-- fixing bugs that span multpile flakes
-- implementing features that require coordination across multiple flakes
+Product Owners are permitted to stay focused on what that they own.
+Their job is more compatible with fine-tuned expertise.
 
 ### An Example
 
