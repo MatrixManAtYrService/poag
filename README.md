@@ -9,10 +9,10 @@
 
 `poag` looks for nix flakes and understands system design in terms of their inputs and outputs.
 It creates a corresponding graph of AI product owners whose comunication graph is homomorphic to the flake graph.
-Developers (or their agents) can use the various `poag` subcommands to communicate with the agent graph.
+Developers (or their agents) can use various `poag` subcommands to communicate with the agent graph.
 
 Each agent in the poag can:
-- delegate to the appropriate specialist
+- delegate to the appropriate owner
 - plan changes
 - answer questions about...
   - how to use the software
@@ -88,32 +88,7 @@ When they're in agreement about the plan, I'll get something like this:
 ```
 I can then feed this to my coding agent and supervise the work.
 
-## Why?
-
-For large projects, it's not practical to expect a single agent to have a complete picture of the code in their context window because then there's not enough headroom for actually doing the job.
-
-### Many Partial Contexts, one Context Window
-
-One approach is to instruct the agent to explore the project and come up with a plan.
-In the example above they'd end up with partial knowledge of four subflakes.
-Later, if I wanted another change made, It might still require partial knowledge of four subflakes, but it might need to be knowledge of different parts.
-
-This is wasteful because each set of partial knowledges is specific to the prompt, so it's not worth re-using for the next prompt.
-This puts us in a mode where all context is use-once-and-forget.
-
-### Many Agents With "full" Context
-
-In the above example, it might be somewhat costly to crate four experts and provide them with enough context to set the stage for gossip between them.
-But, once they have mastery of their flake and they understand what they require of their neighbors (and what their neighbors require of them), we can make conversation checkpoints.
-At that point, they can be consulted, rewound, and consulted again--one can rely on their expertise multiple times without repaying the cost of developing that expertise.
-
-As the project changes, they'll still need to be updated about those changes, but by not forcing them to wear multiple hats, their context remains pure and they retain some of the magic that we see in demo's where LLM's code impressive things from scratch.
-The developer agent, who consumes their directions, will not exhibit that magic, since it must span multiple contexts.
-Unlike the product owners, its context will not be reused, but it's my hypothesis that it will benefit from the product owner recommendations and will need fewer tokens to get its job done.
-
-At a certain point, the reduced needs of the developer (who doesn't recycle context) will outweigh the increased needs of the product owners (who do recycle context).
-
-## Nix Subflakes
+## Nix Subflake Playground
 
 One half of this project is a copy of [hello-subflakes](https://github.com/MatrixManAtYrService/hello-subflakes):
 
@@ -125,7 +100,7 @@ One half of this project is a copy of [hello-subflakes](https://github.com/Matri
 It's a fancy hello world involving a Rust/Python FFI, compiling Rust to WASM, and then testing the rust-written functionality both via a browser and also via a python library.
 It's not useful for anything, but it's a good playground for the other half of this project.
 
-## `poag` CLI
+## Poag Subflakes
 
 There are a few more subflakes which are part of the poag project
 
@@ -135,6 +110,39 @@ There are a few more subflakes which are part of the poag project
   - poag-client (the poag python client, used by the CLI)
   - poag-ui (the poag front end)
 
-When it's mature, `poag` will be all alone in a repo, ready to be used as a flake input wherever it's needed.
+When it's mature, `poag` will be in dedicate a repo, ready to be used as a flake input wherever it's needed.
 Since it's experimental, it's currently packaged together with this subflake playground so that it has something to operate on.
+
+## `poag` CLI
+
+This section TODO
+
+### plan
+
+```
+$ echo "autonomous aerial brand ambassadors to maximize paperclip demand" | poag plan
+flake          issue  name        status
+tech.hardware  2      hypnodrones created
+strategy       37          
+
+```
+
+### ask
+
+```
+$ echo "are the hypnodrones done yet?" | poag plan
+```
+
+### issues
+
+```
+foo/bar $ poag issues list
+ foo.bar    2    hypnodrones    in progress
+
+foo/bar $ poag issues list -a
+ foo.bar    1    coherent extrapolated volition    complete
+ foo.bar    2    hypnodrones                       in progress
+```
+
+
 
