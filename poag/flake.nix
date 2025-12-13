@@ -9,6 +9,7 @@
     beads = {
       url = "github:steveyegge/beads";
       inputs.nixpkgs.follows = "nixpkgs";
+      inputs.flake-utils.follows = "flake-utils";
     };
 
     pyproject-nix = {
