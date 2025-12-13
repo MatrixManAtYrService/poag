@@ -4,6 +4,13 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
+
+    # Beads - git-backed issue tracker for AI coding workflows
+    beads = {
+      url = "github:steveyegge/beads";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     pyproject-nix = {
       url = "github:pyproject-nix/pyproject.nix";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -23,7 +30,7 @@
     };
   };
 
-  outputs = { self, nixpkgs, flake-utils, pyproject-nix, uv2nix, pyproject-build-systems }:
+  outputs = { self, nixpkgs, flake-utils, beads, pyproject-nix, uv2nix, pyproject-build-systems }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
@@ -49,11 +56,25 @@
         # Virtual environment with all dependencies
         poagEnv = pythonSet.mkVirtualEnv "poag-env" workspace.deps.default;
 
+        # Override beads with correct Go modules hash
+        beadsFixed = beads.packages.${system}.default.overrideAttrs (old: {
+          vendorHash = "sha256-KRR6dXzsSw8OmEHGBEVDBOoIgfoZ2p0541T9ayjGHlI=";
+        });
+
+        # Combined package with both poag and bd commands
+        poagWithBeads = pkgs.symlinkJoin {
+          name = "poag-with-beads";
+          paths = [ poagEnv beadsFixed ];
+          meta = {
+            description = "POAG agent orchestration with Beads issue tracker";
+          };
+        };
+
       in
       {
         devShells.default = pkgs.mkShell {
           buildInputs = [
-            poagEnv
+            poagWithBeads
             pkgs.uv
             pkgs.nix  # For running nix flake metadata
           ];
@@ -64,11 +85,14 @@
               echo "Warning: ANTHROPIC_API_KEY not found in ~/.anthropic-api-key" >&2
             fi
             echo "POAG development environment"
-            echo "Run: poag plan 'your request'"
+            echo "Available commands:"
+            echo "  poag plan 'request'  # Generate development plan"
+            echo "  bd init              # Initialize issue tracker"
+            echo "  bd list              # List issues"
           '';
         };
 
-        packages.default = poagEnv;
+        packages.default = poagWithBeads;
       }
     );
 }
