@@ -107,6 +107,15 @@ EOF
             # POAG for agent discovery
             poag.packages.${system}.default
           ];
+
+          shellHook = ''
+            echo "hello-rs development environment"
+            echo ""
+            echo "Agent tools available:"
+            echo "  poag plan 'request'  # Get development guidance"
+            echo "  bd init              # Initialize issue tracker"
+            echo "  bd ready             # Show ready-to-work issues"
+          '';
         };
       });
 }

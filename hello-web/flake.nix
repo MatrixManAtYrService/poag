@@ -92,6 +92,11 @@
           shellHook = ''
             echo "Hello Web Development Environment"
             echo ""
+            echo "Agent tools available:"
+            echo "  poag plan 'request'  # Get development guidance"
+            echo "  bd init              # Initialize issue tracker"
+            echo "  bd ready             # Show ready-to-work issues"
+            echo ""
             echo "To develop:"
             echo "  1. Build WASM: cd ../hello-wasm && nix build"
             echo "  2. Copy WASM: cp ../hello-wasm/result/lib/hello_wasm.wasm ./"

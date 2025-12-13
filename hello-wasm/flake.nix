@@ -224,6 +224,11 @@ EOF
             unset DEVELOPER_DIR
             echo "WebAssembly Component Development Environment"
             echo ""
+            echo "Agent tools available:"
+            echo "  poag plan 'request'  # Get development guidance"
+            echo "  bd init              # Initialize issue tracker"
+            echo "  bd ready             # Show ready-to-work issues"
+            echo ""
             echo "Build commands:"
             echo "  cargo build --target wasm32-wasip2 --release"
             echo ""
