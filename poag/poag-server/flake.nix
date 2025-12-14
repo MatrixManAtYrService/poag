@@ -29,13 +29,9 @@
           sourcePreference = "wheel";
         };
 
-        # Override source for the generated API server
-        # uv.lock contains poag-api-server as a path dependency, but at Nix build time
-        # we want to use the source from the flake input instead of the local symlink
-        sourceOverride = final: prev: {
-          poag-api-server = prev.poag-api-server.overrideAttrs (old: {
-            src = poag-api.packages.${system}.server-source;
-          });
+        # Inject the generated API server package via overlay
+        apiServerOverlay = final: prev: {
+          poag-api-server = poag-api.packages.${system}.server-pkg;
         };
 
         pythonSet = (pkgs.callPackage pyproject-nix.build.packages {
@@ -44,7 +40,7 @@
           pkgs.lib.composeManyExtensions [
             pyproject-build-systems.overlays.default
             overlay
-            sourceOverride
+            apiServerOverlay
           ]
         );
 
@@ -56,7 +52,7 @@
         editablePythonSet = pythonSet.overrideScope (
           pkgs.lib.composeManyExtensions [
             editableOverlay
-            sourceOverride  # Ensure generated API server source override is applied in dev shell
+            apiServerOverlay
           ]
         );
 

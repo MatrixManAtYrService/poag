@@ -54,19 +54,8 @@
         childOverrides = final: prev: {
           poag-server = poag-server.packages.${system}.lib;
           poag-client = poag-client.packages.${system}.lib;
-        };
-
-        # Override sources for generated API packages (from uv.lock path dependencies)
-        # The workspace's uv.lock contains poag-api-server and poag-api-client as path dependencies
-        # (transitively through poag-server and poag-client dependencies)
-        # At Nix build time, we override to use the actual generated sources from flake inputs
-        sourceOverrides = final: prev: {
-          poag-api-server = prev.poag-api-server.overrideAttrs (old: {
-            src = poag-server.packages.${system}.api-server-source;
-          });
-          poag-api-client = prev.poag-api-client.overrideAttrs (old: {
-            src = poag-client.packages.${system}.api-client-source;
-          });
+          poag-api-server = poag-server.packages.${system}.api-server-pkg;
+          poag-api-client = poag-client.packages.${system}.api-client-pkg;
         };
 
         pythonSet = (pkgs.callPackage pyproject-nix.build.packages {
@@ -76,7 +65,6 @@
             pyproject-build-systems.overlays.default
             overlay
             childOverrides  # Replaces packages with pre-built versions
-            sourceOverrides  # Override generated API package sources
           ]
         );
 

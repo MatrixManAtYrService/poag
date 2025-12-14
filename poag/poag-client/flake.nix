@@ -20,22 +20,28 @@
         pkgs = nixpkgs.legacyPackages.${system};
         python = pkgs.python312;
 
-        # Load the workspace for dependency management
+        # Create source tree with path dependencies in place
+        # This must happen before loadWorkspace so the path dependency can be resolved
+        srcWithGeneratedDeps = pkgs.runCommand "poag-client-src-with-deps" {
+          src = ./.;
+        } ''
+          # Copy source to output
+          cp -r $src $out
+          chmod -R u+w $out
+
+          # Create the generated directory with the dependency
+          mkdir -p $out/generated
+          cp -r ${poag-api.packages.${system}.client-py-source} $out/generated/poag-api-client
+        '';
+
+        # Load the workspace from the augmented source tree
+        # Use outPath to convert the derivation to a path (triggers IFD)
         workspace = uv2nix.lib.workspace.loadWorkspace {
-          workspaceRoot = ./.;
+          workspaceRoot = srcWithGeneratedDeps.outPath;
         };
 
         overlay = workspace.mkPyprojectOverlay {
           sourcePreference = "wheel";
-        };
-
-        # Override source for the generated API client
-        # uv.lock contains poag-api-client as a path dependency, but at Nix build time
-        # we want to use the source from the flake input instead of the local symlink
-        sourceOverride = final: prev: {
-          poag-api-client = prev.poag-api-client.overrideAttrs (old: {
-            src = poag-api.packages.${system}.client-py-source;
-          });
         };
 
         pythonSet = (pkgs.callPackage pyproject-nix.build.packages {
@@ -44,7 +50,6 @@
           pkgs.lib.composeManyExtensions [
             pyproject-build-systems.overlays.default
             overlay
-            sourceOverride
           ]
         );
 
@@ -53,12 +58,7 @@
           root = "$REPO_ROOT";
         };
 
-        editablePythonSet = pythonSet.overrideScope (
-          pkgs.lib.composeManyExtensions [
-            editableOverlay
-            sourceOverride  # Ensure generated API client source override is applied in dev shell
-          ]
-        );
+        editablePythonSet = pythonSet.overrideScope editableOverlay;
 
         # Virtual environment with all dependencies
         clientEnv = pythonSet.mkVirtualEnv "poag-client-env" workspace.deps.default;

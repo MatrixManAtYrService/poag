@@ -9,11 +9,12 @@ dependencies = [
     "pydantic>=2.10.5",
     "xdg-base-dirs>=6.0.2",
     "pact-python>=3.2.1",
-    "poag-api-server>=0.1.0",
+    "poag-api-server>=0.1.0",  # Provided via Nix overlay
+    # Transitive dependencies from generated poag-api-server
+    "python-multipart>=0.0.18",
+    "pyyaml>=5.4.1",
+    "aiofiles>=23.1.0",
 ]
-
-[tool.uv.sources]
-poag-api-server = { path = "./generated/poag-api-server" }
 
 [project.optional-dependencies]
 dev = [
