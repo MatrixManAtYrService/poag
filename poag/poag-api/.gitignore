@@ -1,5 +1,5 @@
-# Fern-generated code (regenerate with scripts/generate.sh)
-generated/
+# Note: generated/ is now COMMITTED to git
+# This allows Nix packages to build reproducibly without network access
 
 # Python
 __pycache__/

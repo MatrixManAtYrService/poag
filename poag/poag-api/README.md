@@ -1,205 +1,221 @@
 # POAG API
 
-OpenAPI specification and code generation for the POAG (Product Owner Agent Graph) API.
+OpenAPI specification and generated client/server for the Product Owner Agent Graph API.
 
 ## Overview
 
-This subflake provides:
-- **OpenAPI spec** (`poag.json`) defining the API contract
-- **Python client SDK** generated from the spec
-- **FastAPI server** generated from the spec
-- **Type-safe** Pydantic v2 models shared between client and server
+This subflake manages the POAG API specification and automatically generates:
+- **FastAPI Server** - Python server implementation
+- **Python Client** - Python client library
+- **TypeScript Client** - TypeScript/JavaScript client library
+- **API Documentation** - HTML documentation
 
-## Quick Start
-
-```bash
-# Enter the development shell
-nix develop
-
-# Generate client and server code with Fern (requires Docker)
-./scripts/generate.sh
-
-# Run tests
-pytest tests/ -v
-
-# Build packages
-nix build .#client-py
-nix build .#server
-```
+All code generation is:
+- **Fully offline** - Uses OpenAPI Generator CLI (no cloud calls)
+- **Reproducible** - Deterministic builds via Nix
+- **Pure** - No network access during builds
+- **Validated** - Automated tests verify generated packages
 
 ## Code Generation
 
-### Fern-based Generation (Recommended)
-
-For full type safety and Pydantic v2 support:
+Code is generated automatically during `nix build` using [OpenAPI Generator](https://openapi-generator.tech/):
 
 ```bash
-# Generate both client and server
-./scripts/generate.sh
+# Generate all packages
+nix build .#server      # FastAPI server
+nix build .#client-py   # Python client
+nix build .#client-ts   # TypeScript client
+nix build .#docs        # HTML documentation
 
-# Or use Fern directly
-cd fern
-fern generate --group all
+# Access the generated code
+ls -la result/
 ```
 
-This generates:
-- `generated/client-py/` - Full Python SDK with async support
-- `generated/server/` - FastAPI server stubs with abstract service classes
+### Why OpenAPI Generator?
 
-### Stub Generation (Fallback)
-
-If you don't run Fern generation, Nix builds will use simple stub implementations that work for basic testing but lack the full type safety and features of Fern-generated code.
-
-## Project Structure
-
-```
-poag-api/
-├── poag.json                # OpenAPI 3.0 specification
-├── fern/                    # Fern configuration
-│   ├── fern.config.json
-│   └── generators.yml       # Python client + FastAPI server config
-├── generated/               # Fern output (gitignored, regenerate locally)
-│   ├── client-py/
-│   └── server/
-├── scripts/
-│   └── generate.sh          # Fern generation script
-├── tests/
-│   ├── test_openapi_spec.py        # Spec validation
-│   └── test_client_server_integration.py  # Integration tests
-├── pyproject.toml           # Dependencies
-├── uv.lock                  # Locked dependencies
-└── flake.nix                # Nix package definition
-```
-
-## Fern Configuration
-
-The `fern/generators.yml` configures two generators:
-
-1. **fernapi/fern-python-sdk** (v4.45.9)
-   - Generates typed Python client with sync/async support
-   - Pydantic v2 models
-   - Auto-pagination, retries, OAuth support
-
-2. **fernapi/fern-fastapi-server** (v0.0.33)
-   - Generates abstract service classes
-   - FastAPI app registration
-   - Pydantic v2 request/response models
-
-Both use `pydantic_config.version: v2` for native Pydantic v2 support.
+We switched from Fern to OpenAPI Generator because:
+- ✅ Fully offline (packaged in nixpkgs)
+- ✅ Works with `nix build` (pure, reproducible)
+- ✅ Supports all error codes and response types
+- ✅ Mature and widely adopted
+- ✅ No cloud dependencies or Docker required
 
 ## Development Workflow
 
-### 1. Modify the API
-
-Edit `poag.json` to add/change endpoints:
-
-```json
-{
-  "paths": {
-    "/hello": {
-      "get": {
-        "operationId": "getHello",
-        "responses": { ... }
-      }
-    }
-  }
-}
-```
-
-### 2. Validate
-
 ```bash
-fern check
-```
+# Enter development environment
+nix develop
 
-### 3. Regenerate Code
+# Edit the OpenAPI specification
+vim poag.json
 
-```bash
-./scripts/generate.sh
-```
-
-### 4. Implement Business Logic
-
-For Fern-generated servers, implement the abstract service classes:
-
-```python
-# my_implementation.py (NOT in generated/)
-from generated.server.resources.hello.service.service import AbstractHelloService
-from generated.server.types import HelloResponse
-
-class HelloService(AbstractHelloService):
-    def get_hello(self) -> HelloResponse:
-        return HelloResponse(message="world")
-```
-
-Then register with your FastAPI app:
-
-```python
-from fastapi import FastAPI
-from generated.server.register import register
-from my_implementation import HelloService
-
-app = FastAPI()
-register(app, hello=HelloService())
-```
-
-### 5. Test
-
-```bash
+# Generate and test
+nix build .#server
 pytest tests/ -v
+
+# Run all checks
+nix flake check
 ```
 
-## Using the Generated Client
+### Important Notes
 
-```python
-from generated.client_py import PoagClient
-
-# Synchronous
-client = PoagClient(base_url="http://localhost:8000")
-response = client.hello.get_hello()
-print(response.message)  # "world"
-
-# Async
-from generated.client_py import AsyncPoagClient
-
-async def main():
-    client = AsyncPoagClient(base_url="http://localhost:8000")
-    response = await client.hello.get_hello()
-    print(response.message)
-```
-
-## Nix Builds
-
-The flake provides these outputs:
-
-- `packages.default` - Python environment with all dependencies
-- `packages.client-py` - Generated Python client SDK
-- `packages.server` - Generated FastAPI server stubs
-- `packages.test-env` - Combined environment for testing
-- `checks.pytest` - Automated test suite
+- The devShell loads **independently** of code generation
+- Even if your OpenAPI spec has errors, you can still enter the devShell to fix them
+- Code generation only happens when you explicitly run `nix build`
+- Tests validate the structure of generated packages
 
 ## Testing
 
-The test suite includes:
+Tests are organized into three categories:
 
-1. **OpenAPI Spec Validation** - Ensures `poag.json` is valid
-2. **Integration Tests** - Tests client + server together
-   - Builds both packages with Nix
-   - Starts FastAPI server
-   - Calls endpoints with generated client
-   - Validates responses match schema
+### 1. Specification Tests
+- `test_openapi_spec.py` - Validates poag.json is valid OpenAPI 3.0
+- `test_sessions_spec.py` - Tests session endpoint definitions
 
-## Next Steps
+### 2. Generated Package Tests
+- `test_generated_packages.py` - Validates structure of all generated packages
+  - Checks for required files (models, APIs, etc.)
+  - Verifies Python and TypeScript packages are well-formed
+  - Ensures consistency across all three packages
 
-This is **Milestone 1** of the POAG project. Future milestones:
+### 3. Integration Tests
+- Full end-to-end tests are in a separate subflake
+- This keeps the API spec/generation focused and lightweight
 
-- **Milestone 2**: Business logic libraries (poag-server-logic, poag-client-logic)
-- **Milestone 3**: TypeScript client + React UI (poag-ui)
-- **Milestone 4**: Wire into main `poag` CLI
+Run tests:
+```bash
+# In devShell
+pytest tests/ -v
 
-## References
+# Or via Nix check
+nix flake check
+```
 
-- [Fern Documentation](https://docs.buildwithfern.com/)
-- [OpenAPI 3.0 Spec](https://swagger.io/specification/)
-- [FastAPI](https://fastapi.tiangolo.com/)
-- [Pydantic v2](https://docs.pydantic.dev/latest/)
+## Package Structure
+
+### FastAPI Server (`nix build .#server`)
+```
+src/poag_api_server/
+├── apis/              # API route handlers
+├── models/            # Pydantic models
+├── main.py           # FastAPI app entry point
+└── security_api.py   # Authentication/security
+```
+
+### Python Client (`nix build .#client-py`)
+```
+poag_api_client/
+├── api/              # API client methods
+├── models/           # Data models (Pydantic)
+├── api_client.py     # HTTP client
+└── configuration.py  # Client config
+```
+
+### TypeScript Client (`nix build .#client-ts`)
+```
+src/
+├── apis/             # API client classes
+├── models/           # TypeScript interfaces
+└── runtime.ts        # HTTP runtime
+```
+
+## OpenAPI Specification
+
+The API is defined in `poag.json` (OpenAPI 3.0 format).
+
+Current endpoints:
+- `GET /hello` - Simple health check
+- `POST /sessions` - Create new session
+
+To modify the API:
+1. Edit `poag.json`
+2. Run `nix build .#<package>` to regenerate
+3. Run `pytest` to validate
+4. Commit changes
+
+## Nix Flake Outputs
+
+```bash
+# Packages
+nix build .#server      # FastAPI server package
+nix build .#client-py   # Python client package
+nix build .#client-ts   # TypeScript client package
+nix build .#docs        # API documentation
+
+# DevShell
+nix develop            # Development environment
+
+# Checks
+nix flake check        # Run all tests
+```
+
+## Advanced Usage
+
+### Custom OpenAPI Generator Options
+
+The flake.nix file contains the OpenAPI Generator configuration. You can customize:
+- Package names
+- Generator versions
+- Additional properties
+- Template customizations
+
+See the `flake.nix` file for the current configuration.
+
+### Using in Other Projects
+
+```nix
+{
+  inputs.poag-api.url = "path:./poag/poag-api";
+
+  outputs = { self, poag-api, ... }: {
+    # Use the generated packages
+    myPackage = pkgs.buildEnv {
+      name = "my-app";
+      paths = [
+        poag-api.packages.${system}.client-py
+      ];
+    };
+  };
+}
+```
+
+## CI/CD Integration
+
+All builds are pure and reproducible:
+
+```bash
+# In CI pipeline
+nix flake check              # Validate everything
+nix build .#server           # Build server
+nix build .#client-py        # Build Python client
+nix build .#client-ts        # Build TypeScript client
+
+# All outputs are in the Nix store with deterministic paths
+```
+
+## Troubleshooting
+
+### DevShell won't load
+
+The devShell is designed to load **even if the OpenAPI spec has errors**. If it's not loading, check:
+- Nix flake evaluation errors
+- Python dependency issues in pyproject.toml
+
+### Generated code looks wrong
+
+1. Check your OpenAPI spec is valid: `pytest tests/test_openapi_spec.py`
+2. Review OpenAPI Generator logs (available in nix log)
+3. Check the generator version in flake.nix
+
+### Tests failing
+
+Run tests with verbose output:
+```bash
+pytest tests/ -vv --tb=long
+```
+
+Check that the generated packages have the expected structure by examining the nix store output.
+
+## License
+
+See root repository for license information.
