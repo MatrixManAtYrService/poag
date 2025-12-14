@@ -11,7 +11,6 @@ dependencies = [
     "pytest-asyncio>=0.24.0",
     "httpx>=0.28.1",
     "openapi-spec-validator>=0.7.1",
-    "datamodel-code-generator>=0.26.2",
 ]
 
 [project.optional-dependencies]
@@ -24,6 +23,13 @@ dev = [
 [build-system]
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+# This project is for the spec and generated code only, not a package itself
+packages = []
+
+[tool.setuptools.exclude-package-data]
+"*" = ["fern/*", "nix/*", "generated/*", "tests/*", "result"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

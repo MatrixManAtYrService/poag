@@ -46,48 +46,6 @@ It's not clear how reusable this context is, since it's focused on their current
 Product Owners are permitted to stay focused on what that they own.
 Their job is more compatible with fine-tuned expertise.
 
-### An Example
-
-Mostly, I anticipate using it to add context to prompts.
-I'll send `poag` a prompt like:
-
-> Make it ask "are you sure?" on logout and close any active sessions when this happens.
-
-The various experts will chat about my request.
-When they're in agreement about the plan, I'll get something like this:
-
-```json
-{
-  "subflakes": {
-    "foo-ui" : {
-       "./some/test.js": "modify this to check if the question gets asked, currently just makes assertions about the button",
-       "./some/component.js": "there is an on_exit event handler you can hook into here, be sure to not call exited() until after everything else is done"
-     },
-     "foo-server": {
-       "./some/api.rs": "Add the on_exit api here",
-       "./some/controller.rs": "session handling is in this file, you'll have to add some way to alter all sessions at once",
-       "./tests/session_finish.rs": "there are no tests regarding session lifetime, but that should change, add one here"
-     },
-     "foo-event-listener": {
-       "./event_parsing.py": "There's an enum in here that you'll have to update so that telemetry categorizes the new event appropriately"
-     },
-     "foo-uat": {
-       "./tests": "There are several user acceptance tests in here, don't break them, and add one when you're done"
-     }
-  },
-  "plan": [
-    "Create a feature branch",
-    "Run `nix flake check` in ./foo-ui, ./foo-server, and ./foo-uat just to be sure that you're starting with a clean bill of health",
-    "Make the changes to foo-server, your new test should pass, add the changes in that flake to a commit",
-    "Make the changes to foo-ui, your updated test should now pass, add the changes in that flake to a second commit",
-    "Add the new user acceptance test and the new event enum in the event listener, ensure the test passes, also run `pyright` in the event listener flake, if it's clean, add both of these to a third commit",
-    "Run ./generate_docs.sh in the root flake, create a commit with the updates that it makes (I hope you have good docstrings on your new code)",
-    "Create a PR with these four commits and mark it merge-ready",
-  ]
-}
-```
-If my hunch is correct, the development process will be streamlined by having received such advice up front, and that savings will offset the tokens used by the poag.
-
 ## Nix Subflake Playground
 
 One half of this project is a copy of [hello-subflakes](https://github.com/MatrixManAtYrService/hello-subflakes):
@@ -115,34 +73,82 @@ Since it's experimental, it's currently packaged together with this subflake pla
 
 ## `poag` CLI
 
-This section TODO
+You can run `poag` commands in the root flake devshell, or at any of its children.
+This allows you to engage with narrower or broader subsets of the poag.
+
+### onboard
+
+`poag onboard` will explain how to use poag.
+This is not for the product owners themselves, but rather for the developer.
+
+In addition to the commands indicated below it covers things like how to run a commands in a subflake:
+```
+nix develop ./path/to/subflake --unset PATH --command echo hello world
+```
+This ensures that whatever dependencies are used are indeed declared in that flake and not inherited from the calling environment.
+
 
 ### plan
 
+The `plan` verb causes the poag to research what would be needed in order to make a change.
+The agents will create issues [using beads](https://github.com/steveyegge/beads) to indicate the necessary work.
+Once the necessary issues are created, a prompt will be written to stdout. 
+This prompt can be handed off to a developer so they can use to start the work.
+
+The idea is that since agents have focused context and are not asked to make changes, they can operate headlessly.
+Developers, by contrast, may or may not need human supervision.
+
 ```
 $ echo "autonomous aerial brand ambassadors to maximize paperclip demand" | poag plan
-flake          issue  name        status
-tech.hardware  2      hypnodrones created
-strategy       37          
-
+stderr > bd create "coherent extrapolated volition"? Y/n
+stdin  > \n
+stderr > bd create "hypnodrones"? Y/n
+stdin  > \n
+stderr > bd dep add issue-2 issue-1? Y/n
+stdin  > \n
+stdout > run `poag onboard`
+stdout > then run `bd onboard` and follow the instructions
+stdout > then run `bd show issue-a1b2` and begin work on that issue
 ```
 
 ### ask
 
+<<<<<<< HEAD
 ```
 $ echo "are the hypnodrones done yet?" | poag ask
 ```
 
 ### issues
+=======
+As a human user it might be nice to lean on the poag's expertise
 
 ```
-foo/bar $ poag issues list
- foo.bar    2    hypnodrones    in progress
-
-foo/bar $ poag issues list -a
- foo.bar    1    coherent extrapolated volition    complete
- foo.bar    2    hypnodrones                       in progress
+$ echo "where is the power button on this hypnodrone?" | poag ask
+stdout > it's on the top just besides the circular lidar array
 ```
+
+Both `ask` and `plan` use the cwd to determine which owner to ask (the owners might then ask each other).
+You can also specify a path to a flake as a way of starting the conversation with a different owner.
+
+This may cut down on the gossip necessary to reach the right owner.
+```
+$ echo "where is the power button on this hypnodrone?" | poag ask ./tech/hardware
+```
+
+## `poag` server and session handling
+
+Many poag commands will check `$XDG_STATE_HOME/poag/pid` and `$XDG_STATE_HOME/poag/port` to see if there's already a poag server running.
+If so, they'll just create a new session and use the existing server (session ID: `{cwd}.{pid}.{counter}`, these are used for observability).
+
+Generally speaking, owners in the poag are headless, and once you've selected an owner to communicate with, you get your responses from it (not from its subordinates or superiors, even if they were consulted by your selected owner as part of forming its response).
+Run a command, get a response, done.
+
+But if you want a more interactive experience, you can open a browser (run `poag view`).
+You can aldo manage poag server state independently of the commands that need it:
+- `poag serve`
+- `poag status`
+- `poag stop`
+
 
 
 

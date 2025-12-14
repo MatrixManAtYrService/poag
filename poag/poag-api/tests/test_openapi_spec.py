@@ -45,6 +45,24 @@ def test_hello_endpoint_in_spec():
     assert "200" in hello_get["responses"], "/hello should define 200 response"
 
     response_schema = hello_get["responses"]["200"]["content"]["application/json"]["schema"]
-    assert "properties" in response_schema, "Response should have properties"
-    assert "message" in response_schema["properties"], "Response should have message field"
-    assert response_schema["properties"]["message"]["type"] == "string", "message should be a string"
+
+    # Check if it uses a $ref or inline schema
+    if "$ref" in response_schema:
+        # Extract the component name from $ref
+        ref_path = response_schema["$ref"]
+        assert ref_path == "#/components/schemas/HelloResponse", "Should reference HelloResponse schema"
+
+        # Verify the referenced schema exists and has correct structure
+        assert "components" in spec, "Spec should have components"
+        assert "schemas" in spec["components"], "Components should have schemas"
+        assert "HelloResponse" in spec["components"]["schemas"], "HelloResponse schema should be defined"
+
+        hello_response = spec["components"]["schemas"]["HelloResponse"]
+        assert "properties" in hello_response, "HelloResponse should have properties"
+        assert "message" in hello_response["properties"], "HelloResponse should have message field"
+        assert hello_response["properties"]["message"]["type"] == "string", "message should be a string"
+    else:
+        # Inline schema
+        assert "properties" in response_schema, "Response should have properties"
+        assert "message" in response_schema["properties"], "Response should have message field"
+        assert response_schema["properties"]["message"]["type"] == "string", "message should be a string"

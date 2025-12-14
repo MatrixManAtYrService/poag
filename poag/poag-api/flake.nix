@@ -9,24 +9,51 @@
     pyproject-nix.url = "github:pyproject-nix/pyproject.nix";
     uv2nix.url = "github:pyproject-nix/uv2nix";
     pyproject-build-systems.url = "github:pyproject-nix/build-system-pkgs";
-
-    # Trifolium for Fern CLI
-    trifolium = {
-      url = "path:../../trifolium";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
   };
 
-  outputs = { self, nixpkgs, flake-utils, pyproject-nix, uv2nix, pyproject-build-systems, trifolium }:
+  outputs = { self, nixpkgs, flake-utils, pyproject-nix, uv2nix, pyproject-build-systems }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
         python = pkgs.python312;
 
-        # Import Fern CLI from trifolium
-        fernCli = pkgs.callPackage ../../trifolium/nix/fern.nix {
-          inherit pkgs;
-          inherit (pkgs) lib stdenv;
+        # Build Fern CLI directly
+        fernCli = pkgs.stdenv.mkDerivation rec {
+          pname = "fern-api";
+          version = "0.95.2";
+
+          src = pkgs.fetchurl {
+            url = "https://registry.npmjs.org/fern-api/-/fern-api-${version}.tgz";
+            hash = "sha256-yC64q0zLzlKuY1Appsmw+iNBFTKCmE5TE1NQCpOj7ag=";
+          };
+
+          nativeBuildInputs = [ pkgs.nodejs pkgs.makeWrapper ];
+
+          dontBuild = true;
+          dontConfigure = true;
+
+          installPhase = ''
+            runHook preInstall
+
+            mkdir -p $out/lib/node_modules/${pname}
+            cp -r . $out/lib/node_modules/${pname}
+            mkdir -p $out/bin
+
+            # Find and link the executable
+            if [ -f $out/lib/node_modules/${pname}/cli.cjs ]; then
+              makeWrapper ${pkgs.nodejs}/bin/node $out/bin/fern \
+                --add-flags "$out/lib/node_modules/${pname}/cli.cjs"
+            elif [ -f $out/lib/node_modules/${pname}/dist/bundle.cjs ]; then
+              makeWrapper ${pkgs.nodejs}/bin/node $out/bin/fern \
+                --add-flags "$out/lib/node_modules/${pname}/dist/bundle.cjs"
+            else
+              echo "ERROR: Could not find fern entry point!"
+              ls -la $out/lib/node_modules/${pname}
+              exit 1
+            fi
+
+            runHook postInstall
+          '';
         };
 
         # Load the workspace for dependency management
@@ -47,41 +74,37 @@
           ]
         );
 
-        # Virtual environment with all dependencies
+        # Editable overlay for development
+        editableOverlay = workspace.mkEditablePyprojectOverlay {
+          root = "$REPO_ROOT";
+        };
+
+        editablePythonSet = pythonSet.overrideScope editableOverlay;
+
+        # Virtual environment with all dependencies (including dev)
         apiEnv = pythonSet.mkVirtualEnv "poag-api-env" workspace.deps.default;
 
-        # Generate Python client using Fern
+        # Python client - use Fern-generated code if available, otherwise create stub
         poagApiClientPy = pkgs.stdenv.mkDerivation {
           pname = "poag-api-client-py";
           version = "0.1.0";
 
           src = ./.;
 
-          nativeBuildInputs = [ fernCli pkgs.nodejs ];
-
           buildPhase = ''
-            mkdir -p $out/client-py
+            # Check if Fern-generated client exists (user ran scripts/generate.sh)
+            if [ -d generated/client-py ] && [ -f generated/client-py/pyproject.toml ]; then
+              echo "Using Fern-generated Python client"
+              cp -r generated/client-py ./client-build
+            else
+              echo "Fern-generated client not found, creating stub client"
+              echo "Run 'scripts/generate.sh' in devShell to generate with Fern"
+              mkdir -p ./client-build/poag_client
 
-            # Create fern config for Python client generation
-            cat > fern.config.json <<EOF
-            {
-              "organization": "poag",
-              "version": "0.1.0"
-            }
-            EOF
-
-            mkdir -p fern
-            cat > fern/api.yml <<EOF
-            openapi: ../poag.json
-            EOF
-
-            # Generate Python client
-            # Note: Fern may need additional config, this is a starting point
-            ${fernCli}/bin/fern generate --api poag.json --language python --output $out/client-py || {
-              echo "Fern generation failed, creating stub client"
-              mkdir -p $out/client-py/poag_client
-              cat > $out/client-py/poag_client/__init__.py <<'PYEOF'
-"""POAG API Python Client - Generated from OpenAPI spec"""
+              cat > ./client-build/poag_client/__init__.py <<'PYEOF'
+"""POAG API Python Client - Stub implementation
+Run scripts/generate.sh in the devShell to generate the full client with Fern.
+"""
 import httpx
 from typing import Dict, Any
 
@@ -109,46 +132,39 @@ class PoagClient:
         self.close()
 PYEOF
 
-              cat > $out/client-py/setup.py <<'SETUPEOF'
-from setuptools import setup, find_packages
-
-setup(
-    name="poag-api-client-py",
-    version="0.1.0",
-    packages=find_packages(),
-    install_requires=["httpx>=0.28.1", "pydantic>=2.10.5"],
-)
-SETUPEOF
-            }
+              cat > ./client-build/pyproject.toml <<'TOMLEOF'
+[project]
+name = "poag-api-client-py"
+version = "0.1.0"
+dependencies = ["httpx>=0.28.1", "pydantic>=2.10.5"]
+TOMLEOF
+            fi
           '';
 
           installPhase = ''
-            # Already created output in buildPhase
-            echo "Client generated at $out/client-py"
+            mkdir -p $out
+            cp -r ./client-build $out/client-py
           '';
         };
 
-        # Generate FastAPI server using datamodel-code-generator
+        # FastAPI server - use Fern-generated code if available, otherwise create stub
         poagApiServer = pkgs.stdenv.mkDerivation {
           pname = "poag-api-server";
           version = "0.1.0";
 
           src = ./.;
 
-          buildInputs = [ apiEnv ];
-
           buildPhase = ''
-            mkdir -p $out/server
+            # Check if Fern-generated server exists (user ran scripts/generate.sh)
+            if [ -d generated/server ]; then
+              echo "Using Fern-generated FastAPI server"
+              cp -r generated/server ./server-build
+            else
+              echo "Fern-generated server not found, creating stub server"
+              echo "Run 'scripts/generate.sh' in devShell to generate with Fern"
+              mkdir -p ./server-build/server
 
-            # Generate Pydantic models from OpenAPI spec
-            ${apiEnv}/bin/datamodel-codegen \
-              --input poag.json \
-              --input-file-type openapi \
-              --output $out/server/models.py \
-              --use-standard-collections \
-              --use-schema-description || {
-                echo "datamodel-codegen failed, creating basic models"
-                cat > $out/server/models.py <<'PYEOF'
+              cat > ./server-build/server/models.py <<'PYEOF'
 """Generated Pydantic models for POAG API"""
 from pydantic import BaseModel
 
@@ -156,23 +172,23 @@ class HelloResponse(BaseModel):
     """Response from /hello endpoint"""
     message: str
 PYEOF
-              }
 
-            # Create FastAPI server implementation
-            cat > $out/server/main.py <<'PYEOF'
-"""POAG API Server - Generated from OpenAPI spec"""
+              cat > ./server-build/server/main.py <<'PYEOF'
+"""POAG API Server - Stub implementation
+Run scripts/generate.sh in the devShell to generate the full server with Fern.
+"""
 from fastapi import FastAPI
 from .models import HelloResponse
 
 app = FastAPI(
     title="POAG API",
-    description="Product Owner Agent Graph API for managing agent interactions and sessions",
+    description="Product Owner Agent Graph API",
     version="0.1.0"
 )
 
 @app.get("/hello", response_model=HelloResponse, tags=["hello"])
 async def get_hello() -> HelloResponse:
-    """Hello World endpoint - Returns a simple greeting message"""
+    """Hello World endpoint"""
     return HelloResponse(message="world")
 
 if __name__ == "__main__":
@@ -180,38 +196,17 @@ if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
 PYEOF
 
-            # Create __init__.py
-            cat > $out/server/__init__.py <<'PYEOF'
+              cat > ./server-build/server/__init__.py <<'PYEOF'
 """POAG API Server"""
 from .main import app
 __all__ = ["app"]
 PYEOF
-
-            # Create setup.py for the server package
-            cat > $out/setup.py <<'SETUPEOF'
-from setuptools import setup, find_packages
-
-setup(
-    name="poag-api-server",
-    version="0.1.0",
-    packages=find_packages(),
-    install_requires=[
-        "fastapi>=0.115.6",
-        "uvicorn>=0.34.0",
-        "pydantic>=2.10.5",
-    ],
-    entry_points={
-        "console_scripts": [
-            "poag-api-server=server.main:app",
-        ],
-    },
-)
-SETUPEOF
+            fi
           '';
 
           installPhase = ''
-            # Already created output in buildPhase
-            echo "Server generated at $out/server"
+            mkdir -p $out
+            cp -r ./server-build/server $out/
           '';
         };
 
@@ -235,33 +230,46 @@ SETUPEOF
         };
 
         devShells.default = pkgs.mkShell {
-          packages = with pkgs; [
+          buildInputs = with pkgs; [
+            (editablePythonSet.mkVirtualEnv "poag-api-dev" workspace.deps.all)
             uv
             fernCli
           ];
-          buildInputs = [
-            apiEnv
-          ];
+          env = {
+            UV_NO_SYNC = "1";
+            UV_PYTHON = python.interpreter;
+            UV_PYTHON_DOWNLOADS = "never";
+          };
           shellHook = ''
+            export REPO_ROOT=$(pwd)
+            chmod +x scripts/generate.sh 2>/dev/null || true
+
             echo "POAG API development environment"
             echo ""
-            echo "Available commands:"
+            echo "Code generation:"
+            echo "  ./scripts/generate.sh   # Generate client & server with Fern (requires Docker)"
+            echo "  fern check              # Validate OpenAPI spec and Fern config"
+            echo ""
+            echo "Testing & building:"
             echo "  pytest tests/ -v        # Run tests"
             echo "  nix build .#client-py   # Build Python client"
             echo "  nix build .#server      # Build FastAPI server"
+            echo "  nix flake check         # Run all checks"
             echo ""
             echo "OpenAPI spec: poag.json"
+            echo "Fern config: fern/generators.yml"
           '';
         };
 
         checks = {
           # Run pytest tests
           pytest = pkgs.runCommand "poag-api-pytest" {
-            buildInputs = [ apiEnv pkgs.nix ];
+            buildInputs = [ apiEnv pkgs.nix pkgs.cacert ];
           } ''
             export HOME=$TMPDIR
             export PYTHONDONTWRITEBYTECODE=1
             export NIX_CONFIG="extra-experimental-features = nix-command flakes"
+            export SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt
 
             # Copy source files to build directory
             cp -r ${./.} ./poag-api

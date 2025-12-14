@@ -23,14 +23,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "message": {
-                      "type": "string",
-                      "example": "world"
-                    }
-                  },
-                  "required": ["message"]
+                  "$ref": "#/components/schemas/HelloResponse"
                 }
               }
             }
@@ -38,12 +31,112 @@
         },
         "tags": ["hello"]
       }
+    },
+    "/sessions": {
+      "post": {
+        "summary": "Create a new session",
+        "description": "Creates a new session ID based on cwd and pid. Returns a complete session ID with counter appended.",
+        "operationId": "createSession",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSessionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Session created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "tags": ["sessions"]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "HelloResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "example": "world"
+          }
+        },
+        "required": ["message"]
+      },
+      "CreateSessionRequest": {
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string",
+            "description": "Current working directory where poag was invoked",
+            "example": "/Users/matt/src/hello-subflakes"
+          },
+          "pid": {
+            "type": "integer",
+            "description": "Process ID of the poag invocation",
+            "example": 12345
+          }
+        },
+        "required": ["cwd", "pid"]
+      },
+      "SessionResponse": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "description": "Complete session ID in format {cwd}.{pid}.{counter}",
+            "example": "/Users/matt/src/hello-subflakes.12345.1"
+          },
+          "counter": {
+            "type": "integer",
+            "description": "Counter value for this cwd/pid combination",
+            "example": 1
+          }
+        },
+        "required": ["session_id", "counter"]
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Error message"
+          }
+        },
+        "required": ["error"]
+      }
     }
   },
   "tags": [
     {
       "name": "hello",
       "description": "Simple hello world endpoints"
+    },
+    {
+      "name": "sessions",
+      "description": "Session management for POAG invocations"
     }
   ]
 }
