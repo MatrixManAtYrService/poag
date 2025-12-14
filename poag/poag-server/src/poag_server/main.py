@@ -1,33 +1,16 @@
 """POAG Server FastAPI application with business logic."""
 
 from fastapi import FastAPI
-from pydantic import BaseModel
 
 from poag_server.config import Home
 from poag_server.storage import SessionStorage
 
-# Models that match the OpenAPI spec
-# (These will be replaced by imports from the generated code in the full integration)
-
-
-class CreateSessionRequest(BaseModel):
-    """Request to create a new session."""
-
-    cwd: str
-    pid: int
-
-
-class SessionResponse(BaseModel):
-    """Response containing session information."""
-
-    session_id: str
-    counter: int
-
-
-class HelloResponse(BaseModel):
-    """Simple hello world response."""
-
-    message: str
+# Import models from the generated API server
+from poag_api_server.models import (
+    CreateSessionRequest,
+    SessionResponse,
+    HelloResponse,
+)
 
 
 # Initialize application

@@ -29,12 +29,22 @@
           sourcePreference = "wheel";
         };
 
+        # Override source for the generated API server
+        # uv.lock contains poag-api-server as a path dependency, but at Nix build time
+        # we want to use the source from the flake input instead of the local symlink
+        sourceOverride = final: prev: {
+          poag-api-server = prev.poag-api-server.overrideAttrs (old: {
+            src = poag-api.packages.${system}.server-source;
+          });
+        };
+
         pythonSet = (pkgs.callPackage pyproject-nix.build.packages {
           inherit python;
         }).overrideScope (
           pkgs.lib.composeManyExtensions [
             pyproject-build-systems.overlays.default
             overlay
+            sourceOverride
           ]
         );
 
@@ -43,7 +53,12 @@
           root = "$REPO_ROOT";
         };
 
-        editablePythonSet = pythonSet.overrideScope editableOverlay;
+        editablePythonSet = pythonSet.overrideScope (
+          pkgs.lib.composeManyExtensions [
+            editableOverlay
+            sourceOverride  # Ensure generated API server source override is applied in dev shell
+          ]
+        );
 
         # Virtual environment with all dependencies
         serverEnv = pythonSet.mkVirtualEnv "poag-server-env" workspace.deps.default;
@@ -56,8 +71,9 @@
           # Expose the built package derivation for parent flake consumption
           lib = pythonSet.poag-server;
 
-          # Expose the generated API server for reference
-          api-server-generated = poag-api.packages.${system}.server;
+          # Expose the generated API server (for parent flake source overrides)
+          api-server-pkg = poag-api.packages.${system}.server-pkg;
+          api-server-source = poag-api.packages.${system}.server-source;
         };
 
         devShells.default = pkgs.mkShell {
@@ -72,6 +88,10 @@
           };
           shellHook = ''
             export REPO_ROOT=$(pwd)
+
+            # Create symlink to generated API server for uv lock
+            mkdir -p generated
+            ln -sfn ${poag-api.packages.${system}.server-source} generated/poag-api-server
 
             echo "POAG Server development environment"
             echo ""

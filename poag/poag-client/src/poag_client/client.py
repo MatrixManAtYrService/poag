@@ -3,28 +3,10 @@
 import os
 from dataclasses import dataclass
 
-import httpx
-from pydantic import BaseModel
-
-
-class CreateSessionRequest(BaseModel):
-    """Request to create a new session."""
-
-    cwd: str
-    pid: int
-
-
-class SessionResponse(BaseModel):
-    """Response containing session information."""
-
-    session_id: str
-    counter: int
-
-
-class HelloResponse(BaseModel):
-    """Simple hello world response."""
-
-    message: str
+# Import the generated API client
+from poag_api_client import ApiClient, Configuration
+from poag_api_client.api import HelloApi, SessionsApi
+from poag_api_client.models import CreateSessionRequest
 
 
 @dataclass
@@ -56,11 +38,18 @@ class PoagClient:
             base_url: Base URL of the POAG server
         """
         self.base_url = base_url
-        self.client = httpx.Client(base_url=base_url)
+
+        # Configure and create the generated API client
+        config = Configuration(host=base_url)
+        self.api_client = ApiClient(configuration=config)
+
+        # Create API instances
+        self.hello_api = HelloApi(self.api_client)
+        self.sessions_api = SessionsApi(self.api_client)
 
     def close(self) -> None:
-        """Close the HTTP client."""
-        self.client.close()
+        """Close the API client."""
+        self.api_client.close()
 
     def __enter__(self) -> "PoagClient":
         """Context manager entry."""
@@ -76,10 +65,8 @@ class PoagClient:
         Returns:
             The message from the server (should be "world")
         """
-        response = self.client.get("/hello")
-        response.raise_for_status()
-        data = HelloResponse.model_validate(response.json())
-        return data.message
+        response = self.hello_api.get_hello()
+        return response.message
 
     def create_session(self, cwd: str | None = None, pid: int | None = None) -> Session:
         """Create a new session on the server.
@@ -101,8 +88,6 @@ class PoagClient:
             pid = os.getpid()
 
         request = CreateSessionRequest(cwd=cwd, pid=pid)
-        response = self.client.post("/sessions", json=request.model_dump())
-        response.raise_for_status()
+        response = self.sessions_api.create_session(request)
 
-        data = SessionResponse.model_validate(response.json())
-        return Session(session_id=data.session_id, counter=data.counter)
+        return Session(session_id=response.session_id, counter=response.counter)

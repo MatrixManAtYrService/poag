@@ -56,6 +56,19 @@
           poag-client = poag-client.packages.${system}.lib;
         };
 
+        # Override sources for generated API packages (from uv.lock path dependencies)
+        # The workspace's uv.lock contains poag-api-server and poag-api-client as path dependencies
+        # (transitively through poag-server and poag-client dependencies)
+        # At Nix build time, we override to use the actual generated sources from flake inputs
+        sourceOverrides = final: prev: {
+          poag-api-server = prev.poag-api-server.overrideAttrs (old: {
+            src = poag-server.packages.${system}.api-server-source;
+          });
+          poag-api-client = prev.poag-api-client.overrideAttrs (old: {
+            src = poag-client.packages.${system}.api-client-source;
+          });
+        };
+
         pythonSet = (pkgs.callPackage pyproject-nix.build.packages {
           inherit python;
         }).overrideScope (
@@ -63,16 +76,17 @@
             pyproject-build-systems.overlays.default
             overlay
             childOverrides  # Replaces packages with pre-built versions
+            sourceOverrides  # Override generated API package sources
           ]
         );
 
-        # Virtual environment with all dependencies (including dev dependencies for tests)
-        # Now includes poag-server and poag-client from Nix-built wheels
+        # Virtual environment with all dependencies (from uv.lock)
+        # poag-api-client and poag-api-server are now in uv.lock via path dependencies
         poagEnv = pythonSet.mkVirtualEnv "poag-env" workspace.deps.all;
 
         # Override beads with correct Go modules hash
         beadsFixed = beads.packages.${system}.default.overrideAttrs (old: {
-          vendorHash = "sha256-KRR6dXzsSw8OmEHGBEVDBOoIgfoZ2p0541T9ayjGHlI=";
+          vendorHash = "sha256-iTPi8+pbKr2Q352hzvIOGL2EneF9agrDmBwTLMUjDBE=";
         });
 
         # Combined package with both poag and bd commands

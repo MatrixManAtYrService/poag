@@ -27,3 +27,4 @@ result-*
 # UV
 uv.lock
 .venv/
+/generated/

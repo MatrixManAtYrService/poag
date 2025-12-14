@@ -29,12 +29,22 @@
           sourcePreference = "wheel";
         };
 
+        # Override source for the generated API client
+        # uv.lock contains poag-api-client as a path dependency, but at Nix build time
+        # we want to use the source from the flake input instead of the local symlink
+        sourceOverride = final: prev: {
+          poag-api-client = prev.poag-api-client.overrideAttrs (old: {
+            src = poag-api.packages.${system}.client-py-source;
+          });
+        };
+
         pythonSet = (pkgs.callPackage pyproject-nix.build.packages {
           inherit python;
         }).overrideScope (
           pkgs.lib.composeManyExtensions [
             pyproject-build-systems.overlays.default
             overlay
+            sourceOverride
           ]
         );
 
@@ -43,7 +53,12 @@
           root = "$REPO_ROOT";
         };
 
-        editablePythonSet = pythonSet.overrideScope editableOverlay;
+        editablePythonSet = pythonSet.overrideScope (
+          pkgs.lib.composeManyExtensions [
+            editableOverlay
+            sourceOverride  # Ensure generated API client source override is applied in dev shell
+          ]
+        );
 
         # Virtual environment with all dependencies
         clientEnv = pythonSet.mkVirtualEnv "poag-client-env" workspace.deps.default;
@@ -56,8 +71,9 @@
           # Expose the built package derivation for parent flake consumption
           lib = pythonSet.poag-client;
 
-          # Expose the generated API client for reference
-          api-client-generated = poag-api.packages.${system}.client-py;
+          # Expose the generated API client (for parent flake source overrides)
+          api-client-pkg = poag-api.packages.${system}.client-py-pkg;
+          api-client-source = poag-api.packages.${system}.client-py-source;
         };
 
         devShells.default = pkgs.mkShell {
@@ -72,6 +88,10 @@
           };
           shellHook = ''
             export REPO_ROOT=$(pwd)
+
+            # Create symlink to generated API client for uv lock
+            mkdir -p generated
+            ln -sfn ${poag-api.packages.${system}.client-py-source} generated/poag-api-client
 
             echo "POAG Client development environment"
             echo ""

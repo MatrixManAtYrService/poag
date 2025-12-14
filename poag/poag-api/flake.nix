@@ -91,12 +91,142 @@
           redocly build-docs ${spec} -o $out/index.html
         '';
 
+        # Build Python client as an installable package
+        python-client-pkg = python.pkgs.buildPythonPackage {
+          pname = "poag-api-client";
+          version = "0.1.0";
+          format = "setuptools";
+
+          src = python-client;
+
+          nativeBuildInputs = with python.pkgs; [
+            setuptools
+            wheel
+          ];
+
+          # The generated client doesn't have a setup.py, so we create one
+          preBuild = ''
+            cat > setup.py << 'EOF'
+from setuptools import setup, find_packages
+
+setup(
+    name="poag-api-client",
+    version="0.1.0",
+    description="POAG API Client",
+    packages=find_packages(),
+    python_requires=">=3.8",
+    install_requires=[
+        "urllib3>=1.25.3,<3.0.0",
+        "python-dateutil>=2.8.2",
+        "pydantic>=2.0.0",
+        "certifi>=2023.7.22",
+        "six>=1.10",
+    ],
+)
+EOF
+          '';
+
+          # Skip tests for generated code
+          doCheck = false;
+
+          pythonImportsCheck = [ "poag_api_client" ];
+
+          # CRITICAL: mkVirtualEnv reads passthru.dependencies, not propagatedBuildInputs
+          passthru = {
+            dependencies = {
+              pydantic = [ ];
+              python-dateutil = [ ];
+              urllib3 = [ ];
+              certifi = [ ];
+              six = [ ];
+            };
+            optional-dependencies = { };
+          };
+        };
+
+        # Build FastAPI server as an installable package
+        python-server-pkg = python.pkgs.buildPythonPackage {
+          pname = "poag-api-server";
+          version = "0.1.0";
+          format = "setuptools";
+
+          src = fastapi-server;
+
+          nativeBuildInputs = with python.pkgs; [
+            setuptools
+            wheel
+          ];
+
+          # The generated server doesn't have a proper setup.py, so we create one
+          preBuild = ''
+            cat > setup.py << 'EOF'
+from setuptools import setup, find_packages
+
+setup(
+    name="poag-api-server",
+    version="0.1.0",
+    description="POAG API Server (Generated)",
+    packages=find_packages(where="src"),
+    package_dir={"": "src"},
+    python_requires=">=3.8",
+    install_requires=[
+        "fastapi>=0.120.0",
+        "pydantic>=2.0",
+        "uvicorn[standard]>=0.13.4",
+        "starlette>=0.49.0",
+        "python-multipart>=0.0.18",
+        "PyYAML>=5.4.1",
+        "aiofiles>=23.1.0",
+    ],
+)
+EOF
+          '';
+
+          # Skip tests for generated code
+          doCheck = false;
+
+          pythonImportsCheck = [ "poag_api_server" ];
+
+          # CRITICAL: mkVirtualEnv reads passthru.dependencies, not propagatedBuildInputs
+          passthru = {
+            dependencies = {
+              fastapi = [ ];
+              pydantic = [ ];
+              uvicorn = [ ];  # Base uvicorn without extras (extras not in uv.lock)
+              starlette = [ ];
+              python-multipart = [ ];
+              pyyaml = [ ];
+              aiofiles = [ ];
+            };
+            optional-dependencies = { };
+          };
+        };
+
+        # Create source packages with pyproject.toml for uv consumption
+        client-py-source = pkgs.runCommand "poag-api-client-source" {} ''
+          mkdir -p $out
+          cp -r ${python-client}/* $out/
+          chmod -R +w $out
+          cp ${./client-pyproject.toml} $out/pyproject.toml
+        '';
+
+        server-source = pkgs.runCommand "poag-api-server-source" {} ''
+          mkdir -p $out
+          cp -r ${fastapi-server}/* $out/
+          chmod -R +w $out
+          cp ${./server-pyproject.toml} $out/pyproject.toml
+        '';
+
       in
       {
         packages = {
           default = apiEnv;
           server = fastapi-server;
+          server-pkg = python-server-pkg;
+          server-source = server-source;  # For uv consumption
           client-py = python-client;
+          client-py-pkg = python-client-pkg;
+          client-py-source = client-py-source;  # For uv consumption
           client-ts = typescript-client;
           docs = api-docs;
         };

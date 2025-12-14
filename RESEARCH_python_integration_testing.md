@@ -1,254 +1,221 @@
-# Research: Integration Testing with Multiple Python Subflakes in Nix
+# Research: Integrating OpenAPI-Generated Python Packages in Nix Flakes
 
-## Context
+## Current Situation
 
-I have a multi-flake Nix project where each subflake is a Python package managed with `pyproject-nix` and `uv2nix`. I need to run integration tests in a parent flake that import packages from multiple child flakes.
+We have a multi-flake Nix project using `pyproject-nix` and `uv2nix`. We're trying to integrate OpenAPI-generated Python client and server packages into our existing flake structure.
 
-## Current Setup
+### Project Structure
 
-### Flake Structure
 ```
-poag/                          # Parent flake
-├── flake.nix                  # Consumes poag-server and poag-client
-├── tests/test_integration.py  # Needs: import poag_server, import poag_client
-├── pyproject.toml
+poag/                                    # Parent flake
+├── flake.nix                            # Integration tests (imports server + client)
+├── tests/test_integration.py            # Needs: from poag_server import ..., from poag_client import ...
+├── pyproject.toml                       # Lists poag-server, poag-client as dependencies
 └── uv.lock
 
-poag/poag-server/              # Child flake 1
-├── flake.nix                  # Consumes poag-api
-├── src/poag_server/
-├── pyproject.toml
+poag/poag-api/                           # OpenAPI spec + code generation
+├── flake.nix                            # Generates client and server from OpenAPI spec
+├── poag.json                            # OpenAPI 3.0 specification
+└── outputs:
+    ├── client-py (source)               # Generated: poag_api_client package (source)
+    ├── client-py-pkg (package)          # Built: python3.12-poag-api-client-0.1.0
+    ├── server (source)                  # Generated: poag_api_server package (source)
+    └── server-pkg (package)             # Built: python3.12-poag-api-server-0.1.0
+
+poag/poag-client/                        # Client wrapper (business logic)
+├── flake.nix                            # Consumes poag-api as input
+├── src/poag_client/client.py            # Imports: from poag_api_client import ApiClient, Configuration
+├── pyproject.toml                       # Does NOT list poag-api-client (it's Nix-only)
 └── uv.lock
 
-poag/poag-client/              # Child flake 2
-├── flake.nix                  # Consumes poag-api
-├── src/poag_client/
-├── pyproject.toml
+poag/poag-server/                        # Server implementation (business logic)
+├── flake.nix                            # Consumes poag-api as input
+├── src/poag_server/main.py              # Imports: from poag_api_server.models import CreateSessionRequest
+├── pyproject.toml                       # Does NOT list poag-api-server (it's Nix-only)
 └── uv.lock
 ```
 
-### How Each Flake Creates Its Environment
+### What We're Trying to Achieve
 
-Each child flake uses this pattern:
+1. **poag-api generates Python packages** from an OpenAPI spec using `openapi-generator-cli`
+2. **poag-client wraps the generated client** with business logic (session management, etc.)
+3. **poag-server implements the generated server models** with storage and actual endpoints
+4. **Parent flake runs integration tests** that use both client and server together
+
+### What Works
+
+✅ **Code generation**: `poag-api` successfully generates Python source code and builds installable packages:
 ```nix
-{
-  inputs.pyproject-nix.url = "github:pyproject-nix/pyproject.nix";
-  inputs.uv2nix.url = "github:pyproject-nix/uv2nix";
-
-  outputs = { pyproject-nix, uv2nix, ... }:
-    let
-      workspace = uv2nix.lib.workspace.loadWorkspace {
-        workspaceRoot = ./.;
-      };
-
-      overlay = workspace.mkPyprojectOverlay {
-        sourcePreference = "wheel";
-      };
-
-      pythonSet = (pkgs.callPackage pyproject-nix.build.packages {
-        inherit python;
-      }).overrideScope (
-        pkgs.lib.composeManyExtensions [
-          pyproject-build-systems.overlays.default
-          overlay
-        ]
-      );
-
-      # Virtual environment with dependencies
-      myEnv = pythonSet.mkVirtualEnv "my-env" workspace.deps.all;
-    in {
-      packages.default = myEnv;
-    };
-}
-```
-
-## The Problem
-
-In the parent flake, I want to run integration tests that import both `poag_server` and `poag_client`:
-
-```python
-# tests/test_integration.py
-from poag_server.main import app        # From child flake 1
-from poag_client import PoagClient      # From child flake 2
-
-def test_integration():
-    # Test that client can talk to server
-    ...
-```
-
-### What I Tried
-
-**Attempt 1: `buildEnv` to merge environments**
-```nix
-integrationEnv = pkgs.buildEnv {
-  name = "integration-env";
-  paths = [
-    poagEnv                          # Parent's venv
-    poag-server.packages.${system}.default   # Child 1's venv
-    poag-client.packages.${system}.default   # Child 2's venv
-  ];
+# poag-api/flake.nix
+python-client-pkg = python.pkgs.buildPythonPackage {
+  pname = "poag-api-client";
+  version = "0.1.0";
+  src = python-client;  # Generated source
+  propagatedBuildInputs = [ pydantic python-dateutil urllib3 ... ];
 };
 ```
 
-**Result:** ❌ Failed with:
-```
-pkgs.buildEnv error: two given paths contain a conflicting subpath:
-  `/nix/store/.../poag-server-env/bin/python3' and
-  `/nix/store/.../poag-env/bin/python3'
+✅ **Overlay injection**: Both child flakes inject the generated packages via overlays:
+```nix
+# poag-client/flake.nix
+apiClientOverlay = final: prev: {
+  poag-api-client = poag-api.packages.${system}.client-py-pkg;
+};
+
+pythonSet = pythonBase.overrideScope (
+  pkgs.lib.composeManyExtensions [
+    pyproject-build-systems.overlays.default
+    workspace.mkPyprojectOverlay { sourcePreference = "wheel"; }
+    apiClientOverlay
+  ]
+);
 ```
 
-**Attempt 2: Manual `PYTHONPATH`**
+✅ **Packages build**: Both `poag-client` and `poag-server` build successfully:
+```bash
+$ nix build ./poag-client
+$ nix build ./poag-server
+# Both succeed!
+```
+
+### What Doesn't Work
+
+❌ **Generated packages unavailable in dev shells**: The code imports `poag_api_client` but it's not available:
+```bash
+$ cd poag-client
+$ nix develop
+$ python -c "import poag_api_client"
+ModuleNotFoundError: No module named 'poag_api_client'
+```
+
+❌ **Generated packages unavailable in integration tests**:
+```bash
+$ cd poag  # Parent flake
+$ nix develop --command pytest tests/
+ImportError: cannot import name 'CreateSessionRequest' from 'poag_api_server.models'
+```
+
+## The Core Problem
+
+The generated API packages (`poag-api-client`, `poag-api-server`) are:
+- ✅ Built as proper Python packages via `buildPythonPackage`
+- ✅ Injected into the `pythonSet` via overlays
+- ✅ Available when building packages with `nix build`
+- ❌ **NOT available in virtual environments** created by `mkVirtualEnv`
+
+### Why This Happens
+
+When we create virtual environments, we use:
+```nix
+myEnv = pythonSet.mkVirtualEnv "my-env" workspace.deps.all;
+```
+
+The `workspace.deps.all` returns an attribute set of packages that come from `pyproject.toml`/`uv.lock`. The generated API packages are NOT in these files (they're Nix-only dependencies), so they're excluded from the venv.
+
+### What We've Tried
+
+**Attempt 1: Add to workspace.deps.all**
+```nix
+myEnv = pythonSet.mkVirtualEnv "my-env" (workspace.deps.all // {
+  poag-api-client = pythonSet.poag-api-client;
+});
+```
+**Result:** ❌ `error: expected a list but found a set: { type = "derivation"; ... }`
+
+The issue: `pythonSet.poag-api-client` is a derivation, but `workspace.deps.all` expects a specific structure that `mkVirtualEnv` understands.
+
+**Attempt 2: Add editable overlay in dev shell**
+```nix
+editablePythonSet = pythonSet.overrideScope (
+  pkgs.lib.composeManyExtensions [
+    editableOverlay
+    apiClientOverlay  # Include generated package
+  ]
+);
+
+devShells.default = pkgs.mkShell {
+  buildInputs = [
+    (editablePythonSet.mkVirtualEnv "dev" workspace.deps.all)
+  ];
+};
+```
+**Result:** ❌ Same error - the overlay adds the package to pythonSet, but `workspace.deps.all` doesn't include it
+
+**Attempt 3: PYTHONPATH workaround**
 ```nix
 shellHook = ''
-  export PYTHONPATH="${poag-server.packages.${system}.default}/lib/python3.12/site-packages:${poag-client.packages.${system}.default}/lib/python3.12/site-packages:$PYTHONPATH"
+  export PYTHONPATH="${pythonSet.poag-api-client}/lib/python3.12/site-packages:$PYTHONPATH"
 '';
 ```
+**Result:** 🤷 Not yet tested - would work but feels like a hack
 
-**Status:** 🤷 Untested - feels like a hack, may have issues with transitive dependencies
+**Attempt 4: Add to pyproject.toml**
+```toml
+[project]
+dependencies = ["poag-api-client>=0.1.0"]
 
-## Questions
+[tool.uv.sources]
+poag-api-client = { path = "../poag-api/generated/client" }
+```
+**Result:** ❌ Can't work - the generated code isn't in a stable path, it's in `/nix/store/...`
 
-1. **What is the idiomatic way to make packages from multiple `pyproject-nix` flakes available for integration testing?**
+## Key Questions for Further Research
 
-2. **Should I:**
-   - Add `poag-server` and `poag-client` as dependencies in the parent's `pyproject.toml`?
-   - Use `uv2nix` workspace features to create a multi-package workspace?
-   - Use `pyproject-nix` overlays to compose the environments?
-   - Manually manage `PYTHONPATH` (and is there a cleaner way)?
-   - Something else entirely?
+### 1. How does `mkVirtualEnv` work internally?
+- What structure does it expect from the deps attribute set?
+- Can we manually construct the right structure for Nix-only packages?
+- Is there a way to add packages to a venv after it's created?
 
-3. **How do I handle the fact that each child flake's packages are outputs of Nix builds, not editable installs?**
-   - The test needs to import from `${child-flake}/lib/python3.12/site-packages/package_name`
-   - Should I create a custom overlay that adds these paths?
+### 2. What is the intended pattern for Nix-only Python dependencies?
+- These packages don't exist in PyPI
+- They're not in `pyproject.toml`/`uv.lock`
+- They're only available through Nix
+- How do pyproject-nix/uv2nix handle this case?
 
-4. **Is there a way to create a "test-only" Python environment that:**
-   - Uses the parent flake's dependencies (pytest, etc.)
-   - Can import from multiple child flakes
-   - Works with both `nix develop` and `nix flake check`
-   - Doesn't require manual `PYTHONPATH` manipulation
+### 3. Is there an alternative to `mkVirtualEnv`?
+- Can we use `buildEnv` or `python.withPackages` instead?
+- Would that work with uv2nix's workspace model?
+- What would we lose (editable installs, etc.)?
 
-5. **Are there examples of multi-flake Python projects using `pyproject-nix`/`uv2nix` with integration tests?**
+### 4. Should generated code be handled differently?
+- Maybe generated packages should be in a separate derivation?
+- Perhaps we need a "build-time only" vs "runtime" package distinction?
+- Is there a way to make generated packages look like regular workspace dependencies?
 
-## Constraints
+### 5. How do propagatedBuildInputs work with mkVirtualEnv?
+- When we include `poag-client` in the parent venv, should its `propagatedBuildInputs` (including `poag-api-client`) be automatically available?
+- If so, why isn't it working?
+- Do we need to explicitly declare the dependency relationship somewhere?
 
-- Each subflake should remain independently testable (their own unit tests work)
-- The parent flake should not duplicate the child flakes' dependencies
-- Should work in both development (`nix develop`) and CI (`nix flake check`)
-- Prefer idiomatic Nix patterns over shell hacks
+## What We Need
 
-## Desired Outcome
+A way to make Nix-generated Python packages available in virtual environments created by `mkVirtualEnv`, such that:
 
-A clean, reusable pattern for:
-```nix
-# Parent flake
-{
-  inputs = {
-    child-flake-1.url = "path:./child1";
-    child-flake-2.url = "path:./child2";
-  };
+- ✅ Works in `nix develop` (development shells)
+- ✅ Works in `nix flake check` (CI/test environments)
+- ✅ Works in `nix build` (production builds)
+- ✅ Respects dependency relationships (if A depends on B, including A should pull in B)
+- ✅ Integrates cleanly with pyproject-nix/uv2nix patterns
+- ✅ Doesn't require manual `PYTHONPATH` manipulation
+- ✅ Allows editable installs for workspace packages
 
-  outputs = { ... }:
-    let
-      # ??? How to create testEnv that can import from both child flakes ???
-    in {
-      devShells.default = pkgs.mkShell {
-        # Tests can: import child1_package, import child2_package
-      };
+## Reproduction Steps
 
-      checks.pytest = pkgs.runCommand "integration-tests" {
-        # Same capability
-      } ''
-        pytest tests/
-      '';
-    };
-}
+```bash
+cd /path/to/hello-subflakes/poag/poag-client
+nix develop
+python -c "import poag_api_client"  # Fails with ModuleNotFoundError
 ```
 
-## Additional Context
+## Environment Details
 
-- Using `nixpkgs` from `nixos-unstable` channel
-- Python 3.12
-- `pyproject-nix` latest (follows approach in their examples)
-- `uv2nix` latest (uses `workspace.loadWorkspace` pattern)
-- Child flakes already export their packages via `packages.default`
-
----
-
-## Solution: Pre-built Derivation Injection
-
-After trying multiple approaches, the cleanest solution is **Option 1: Export pre-built derivations directly**.
-
-### How It Works
-
-1. **Child flakes** build their packages using pyproject-nix and export the built derivation:
-   ```nix
-   # poag-server/flake.nix
-   {
-     packages = {
-       default = pythonSet.mkVirtualEnv "env" workspace.deps.default;
-       lib = pythonSet.poag-server;  # Export the built package derivation
-     };
-   }
-   ```
-
-2. **Parent flake** declares dependencies in `pyproject.toml`:
-   ```toml
-   [project]
-   dependencies = [
-     "poag-server>=0.1.0",
-     "poag-client>=0.1.0",
-   ]
-
-   [tool.uv.sources]
-   poag-server = { path = "./poag-server", editable = true }
-   poag-client = { path = "./poag-client", editable = true }
-   ```
-
-3. **Parent flake** injects pre-built derivations via overlay:
-   ```nix
-   # poag/flake.nix
-   let
-     overlay = workspace.mkPyprojectOverlay { sourcePreference = "wheel"; };
-
-     # Inject pre-built derivations from child flakes
-     childOverrides = final: prev: {
-       poag-server = poag-server.packages.${system}.lib;
-       poag-client = poag-client.packages.${system}.lib;
-     };
-
-     pythonSet = pythonBase.overrideScope (
-       pkgs.lib.composeManyExtensions [
-         pyproject-build-systems.overlays.default
-         overlay
-         childOverrides  # Replaces packages with pre-built versions
-       ]
-     );
-   in
-   {
-     # Use pythonSet to create virtualenvs
-     packages.default = pythonSet.mkVirtualEnv "poag-env" workspace.deps.all;
-   }
-   ```
-
-### Why This Works
-
-- **No wheel file handling**: pyproject-nix expects derivations, not wheel files
-- **Independent builds**: Each child flake builds its package separately
-- **No duplication**: Parent doesn't rebuild what children already built
-- **Clean composition**: Uses standard Nix overlay mechanism
-- **Works everywhere**: `nix develop`, `nix flake check`, and `nix build` all work
-
-### Test Results
-
-- ✅ All child flake tests pass independently (19 tests for server, 6 for client)
-- ✅ All integration tests pass (7 tests)
-- ✅ Works in `nix develop` for interactive testing
-- ✅ Works in `nix flake check` for CI
-
-### Why NOT Wheel Injection
-
-The initial attempt to export wheel files failed because pyproject-nix's build infrastructure expects source trees or derivations, not pre-built `.whl` files. When you override `src` with a wheel path, the unpack phase doesn't know how to handle it.
+- Nix version: 2.x (with flakes enabled)
+- nixpkgs: nixos-unstable
+- Python: 3.12
+- pyproject-nix: latest (from GitHub)
+- uv2nix: latest (from GitHub)
+- uv: 0.9.x
 
 ---
 
-**Research completed:** Pre-built derivation injection is the idiomatic pattern for multi-flake Python integration with pyproject-nix/uv2nix
+**Current status**: We have working generated Python packages and overlays that inject them into pythonSet, but they're not accessible in virtual environments created by `mkVirtualEnv`. We need to understand how to either (a) make `mkVirtualEnv` include Nix-only dependencies, or (b) use a different environment construction approach that works with our use case.
