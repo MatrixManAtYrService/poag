@@ -1,0 +1,13 @@
+Metadata-Version: 2.4
+Name: poag-server
+Version: 0.1.0
+Summary: POAG server with session management and business logic
+Requires-Python: >=3.12
+Requires-Dist: fastapi>=0.115.6
+Requires-Dist: uvicorn>=0.34.0
+Requires-Dist: pydantic>=2.10.5
+Requires-Dist: xdg-base-dirs>=6.0.2
+Provides-Extra: dev
+Requires-Dist: pytest>=8.3.4; extra == "dev"
+Requires-Dist: pytest-asyncio>=0.24.0; extra == "dev"
+Requires-Dist: httpx>=0.28.1; extra == "dev"

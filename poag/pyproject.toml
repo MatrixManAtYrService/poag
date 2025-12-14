@@ -14,6 +14,8 @@ dependencies = [
     "xdg-base-dirs>=6.0.0",  # XDG directory support
     "pydantic>=2.0.0",  # For config validation
     "networkx>=3.0",  # For dependency graph analysis
+    "poag-server>=0.1.0",  # Subflake: business logic with session storage
+    "poag-client>=0.1.0",  # Subflake: client with session management
 ]
 
 [project.scripts]
@@ -29,4 +31,15 @@ packages = ["src/poag_sf"]
 [dependency-groups]
 dev = [
     "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+    "httpx>=0.28.1",
 ]
+
+[tool.uv.sources]
+poag-server = { path = "./poag-server", editable = true }
+poag-client = { path = "./poag-client", editable = true }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
