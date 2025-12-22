@@ -130,7 +130,7 @@ strategy       37
 ### ask
 
 ```
-$ echo "are the hypnodrones done yet?" | poag plan
+$ echo "are the hypnodrones done yet?" | poag ask
 ```
 
 ### issues
