@@ -86,7 +86,7 @@ When they're in agreement about the plan, I'll get something like this:
   ]
 }
 ```
-I can then feed this to my coding agent and supervise the work.
+If my hunch is correct, the development process will be streamlined by having received such advice up front, and that savings will offset the tokens used by the poag.
 
 ## Nix Subflake Playground
 
