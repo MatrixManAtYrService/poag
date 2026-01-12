@@ -115,33 +115,15 @@ setup(
     description="POAG API Client",
     packages=find_packages(),
     python_requires=">=3.8",
-    install_requires=[
-        "urllib3>=1.25.3,<3.0.0",
-        "python-dateutil>=2.8.2",
-        "pydantic>=2.0.0",
-        "certifi>=2023.7.22",
-        "six>=1.10",
-    ],
+    install_requires=[],  # Dependencies managed by consumer's uv.lock
 )
 EOF
           '';
 
-          # Skip tests for generated code
+          # Skip tests and import checks for generated code
+          # (imports fail without runtime dependencies, which are provided by consumer)
           doCheck = false;
-
-          pythonImportsCheck = [ "poag_api_client" ];
-
-          # CRITICAL: mkVirtualEnv reads passthru.dependencies, not propagatedBuildInputs
-          passthru = {
-            dependencies = {
-              pydantic = [ ];
-              python-dateutil = [ ];
-              urllib3 = [ ];
-              certifi = [ ];
-              six = [ ];
-            };
-            optional-dependencies = { };
-          };
+          dontCheckPythonImports = true;
         };
 
         # Build FastAPI server as an installable package
@@ -169,37 +151,15 @@ setup(
     packages=find_packages(where="src"),
     package_dir={"": "src"},
     python_requires=">=3.8",
-    install_requires=[
-        "fastapi>=0.120.0",
-        "pydantic>=2.0",
-        "uvicorn[standard]>=0.13.4",
-        "starlette>=0.49.0",
-        "python-multipart>=0.0.18",
-        "PyYAML>=5.4.1",
-        "aiofiles>=23.1.0",
-    ],
+    install_requires=[],  # Dependencies managed by consumer's uv.lock
 )
 EOF
           '';
 
-          # Skip tests for generated code
+          # Skip tests and import checks for generated code
+          # (imports fail without runtime dependencies, which are provided by consumer)
           doCheck = false;
-
-          pythonImportsCheck = [ "poag_api_server" ];
-
-          # CRITICAL: mkVirtualEnv reads passthru.dependencies, not propagatedBuildInputs
-          passthru = {
-            dependencies = {
-              fastapi = [ ];
-              pydantic = [ ];
-              uvicorn = [ ];  # Base uvicorn without extras (extras not in uv.lock)
-              starlette = [ ];
-              python-multipart = [ ];
-              pyyaml = [ ];
-              aiofiles = [ ];
-            };
-            optional-dependencies = { };
-          };
+          dontCheckPythonImports = true;
         };
 
         # Create source packages with pyproject.toml for uv consumption

@@ -1,0 +1,22 @@
+[project]
+name = "checks"
+version = "0.1.0"
+description = "Reusable code quality checks for hello-subflakes projects"
+requires-python = ">=3.12"
+dependencies = [
+    "typer>=0.9.0",
+]
+
+[project.scripts]
+check-python-ruff-check = "checks.cli:ruff_check"
+check-python-ruff-format = "checks.cli:ruff_format"
+check-python-ty = "checks.cli:ty_check"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=7.0.0",
+]

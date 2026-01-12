@@ -20,24 +20,11 @@
         pkgs = nixpkgs.legacyPackages.${system};
         python = pkgs.python312;
 
-        # Create source tree with path dependencies in place
-        # This must happen before loadWorkspace so the path dependency can be resolved
-        srcWithGeneratedDeps = pkgs.runCommand "poag-client-src-with-deps" {
-          src = ./.;
-        } ''
-          # Copy source to output
-          cp -r $src $out
-          chmod -R u+w $out
-
-          # Create the generated directory with the dependency
-          mkdir -p $out/generated
-          cp -r ${poag-api.packages.${system}.client-py-source} $out/generated/poag-api-client
-        '';
-
-        # Load the workspace from the augmented source tree
-        # Use outPath to convert the derivation to a path (triggers IFD)
+        # Load workspace from source directory
+        # Note: poag-api-client transitive deps must be manually listed in pyproject.toml
+        # since path dependencies don't work with uv2nix's evaluation-time requirements
         workspace = uv2nix.lib.workspace.loadWorkspace {
-          workspaceRoot = srcWithGeneratedDeps.outPath;
+          workspaceRoot = ./.;
         };
 
         overlay = workspace.mkPyprojectOverlay {
@@ -61,7 +48,11 @@
         editablePythonSet = pythonSet.overrideScope editableOverlay;
 
         # Virtual environment with all dependencies
+        # Note: Generated API client added via PYTHONPATH, not in virtualenv
         clientEnv = pythonSet.mkVirtualEnv "poag-client-env" workspace.deps.default;
+
+        # Dev virtualenv with test dependencies
+        devClientEnv = pythonSet.mkVirtualEnv "poag-client-dev-env" workspace.deps.all;
 
       in
       {
@@ -85,13 +76,11 @@
             UV_NO_SYNC = "1";
             UV_PYTHON = python.interpreter;
             UV_PYTHON_DOWNLOADS = "never";
+            # Add generated API client to PYTHONPATH for development
+            PYTHONPATH = "${poag-api.packages.${system}.client-py-pkg}/${python.sitePackages}";
           };
           shellHook = ''
             export REPO_ROOT=$(pwd)
-
-            # Create symlink to generated API client for uv lock
-            mkdir -p generated
-            ln -sfn ${poag-api.packages.${system}.client-py-source} generated/poag-api-client
 
             echo "POAG Client development environment"
             echo ""
@@ -111,11 +100,13 @@
 
         checks = {
           pytest = pkgs.runCommand "poag-client-pytest" {
-            buildInputs = [ clientEnv pkgs.cacert ];
+            buildInputs = [ devClientEnv pkgs.cacert ];
           } ''
             export HOME=$TMPDIR
             export PYTHONDONTWRITEBYTECODE=1
             export SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt
+            # Add generated API client to PYTHONPATH
+            export PYTHONPATH="${poag-api.packages.${system}.client-py-pkg}/${python.sitePackages}:$PYTHONPATH"
 
             # Copy source files to build directory
             cp -r ${./.} ./poag-client
@@ -123,7 +114,7 @@
             cd ./poag-client
 
             # Run pytest
-            ${clientEnv}/bin/pytest tests/ -v --tb=short
+            ${devClientEnv}/bin/pytest tests/ -v --tb=short
 
             # Create output directory (required for checks)
             mkdir -p $out

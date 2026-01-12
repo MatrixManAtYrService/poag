@@ -7,11 +7,13 @@ dependencies = [
     "httpx>=0.28.1",
     "pact-python>=3.2.1",
     "pydantic>=2.10.5",
-    "poag-api-client>=0.1.0",
+    # poag-api-client is provided via Nix overlay (not in PyPI)
+    # Transitive deps from poag-api-client (from poag-api/client-pyproject.toml)
+    "urllib3>=1.25.3,<3.0.0",
+    "python-dateutil>=2.8.2",
+    "certifi>=2023.7.22",
+    "six>=1.10",
 ]
-
-[tool.uv.sources]
-poag-api-client = { path = "./generated/poag-api-client" }
 
 [project.optional-dependencies]
 dev = [

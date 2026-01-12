@@ -9,8 +9,9 @@ dependencies = [
     "pydantic>=2.10.5",
     "xdg-base-dirs>=6.0.2",
     "pact-python>=3.2.1",
-    "poag-api-server>=0.1.0",  # Provided via Nix overlay
-    # Transitive dependencies from generated poag-api-server
+    # poag-api-server is provided via Nix PYTHONPATH (not in PyPI)
+    # Transitive deps from poag-api-server (from poag-api/server-pyproject.toml)
+    "starlette>=0.49.0",
     "python-multipart>=0.0.18",
     "pyyaml>=5.4.1",
     "aiofiles>=23.1.0",

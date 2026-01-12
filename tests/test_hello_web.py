@@ -42,11 +42,11 @@ def selenium_service(docker_compose_file):
 
     # Print info about pause behavior
     pause_after = os.environ.get("PYTEST_PAUSE_AFTER", "0") == "1"
-    print(f"\n🐳 Starting Selenium Grid")
+    print("\n🐳 Starting Selenium Grid")
     if pause_after:
-        print(f"💡 Pause enabled: Browser will remain open after tests at http://localhost:7900")
+        print("💡 Pause enabled: Browser will remain open after tests at http://localhost:7900")
     else:
-        print(f"💡 Tip: Set PYTEST_PAUSE_AFTER=1 to pause after tests and inspect browser state")
+        print("💡 Tip: Set PYTEST_PAUSE_AFTER=1 to pause after tests and inspect browser state")
 
     # Start the services
     subprocess.run(compose_cmd_base + ["up", "-d"], check=True)

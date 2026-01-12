@@ -20,7 +20,9 @@
         pkgs = nixpkgs.legacyPackages.${system};
         python = pkgs.python312;
 
-        # Load the workspace for dependency management
+        # Load workspace from source directory
+        # Note: poag-api-server transitive deps must be manually listed in pyproject.toml
+        # since path dependencies don't work with uv2nix's evaluation-time requirements
         workspace = uv2nix.lib.workspace.loadWorkspace {
           workspaceRoot = ./.;
         };
@@ -29,18 +31,12 @@
           sourcePreference = "wheel";
         };
 
-        # Inject the generated API server package via overlay
-        apiServerOverlay = final: prev: {
-          poag-api-server = poag-api.packages.${system}.server-pkg;
-        };
-
         pythonSet = (pkgs.callPackage pyproject-nix.build.packages {
           inherit python;
         }).overrideScope (
           pkgs.lib.composeManyExtensions [
             pyproject-build-systems.overlays.default
             overlay
-            apiServerOverlay
           ]
         );
 
@@ -49,15 +45,14 @@
           root = "$REPO_ROOT";
         };
 
-        editablePythonSet = pythonSet.overrideScope (
-          pkgs.lib.composeManyExtensions [
-            editableOverlay
-            apiServerOverlay
-          ]
-        );
+        editablePythonSet = pythonSet.overrideScope editableOverlay;
 
         # Virtual environment with all dependencies
+        # Note: Generated API server added via PYTHONPATH, not in virtualenv
         serverEnv = pythonSet.mkVirtualEnv "poag-server-env" workspace.deps.default;
+
+        # Dev virtualenv with test dependencies
+        devServerEnv = pythonSet.mkVirtualEnv "poag-server-dev-env" workspace.deps.all;
 
       in
       {
@@ -81,13 +76,11 @@
             UV_NO_SYNC = "1";
             UV_PYTHON = python.interpreter;
             UV_PYTHON_DOWNLOADS = "never";
+            # Add generated API server to PYTHONPATH for development
+            PYTHONPATH = "${poag-api.packages.${system}.server-pkg}/${python.sitePackages}";
           };
           shellHook = ''
             export REPO_ROOT=$(pwd)
-
-            # Create symlink to generated API server for uv lock
-            mkdir -p generated
-            ln -sfn ${poag-api.packages.${system}.server-source} generated/poag-api-server
 
             echo "POAG Server development environment"
             echo ""
@@ -108,11 +101,13 @@
 
         checks = {
           pytest = pkgs.runCommand "poag-server-pytest" {
-            buildInputs = [ serverEnv pkgs.cacert ];
+            buildInputs = [ devServerEnv pkgs.cacert ];
           } ''
             export HOME=$TMPDIR
             export PYTHONDONTWRITEBYTECODE=1
             export SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt
+            # Add generated API server to PYTHONPATH
+            export PYTHONPATH="${poag-api.packages.${system}.server-pkg}/${python.sitePackages}:$PYTHONPATH"
 
             # Copy source files to build directory
             cp -r ${./.} ./poag-server
@@ -120,7 +115,7 @@
             cd ./poag-server
 
             # Run pytest
-            ${serverEnv}/bin/pytest tests/ -v --tb=short
+            ${devServerEnv}/bin/pytest tests/ -v --tb=short
 
             # Create output directory (required for checks)
             mkdir -p $out

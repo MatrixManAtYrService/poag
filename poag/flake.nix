@@ -54,8 +54,6 @@
         childOverrides = final: prev: {
           poag-server = poag-server.packages.${system}.lib;
           poag-client = poag-client.packages.${system}.lib;
-          poag-api-server = poag-server.packages.${system}.api-server-pkg;
-          poag-api-client = poag-client.packages.${system}.api-client-pkg;
         };
 
         pythonSet = (pkgs.callPackage pyproject-nix.build.packages {
@@ -69,7 +67,7 @@
         );
 
         # Virtual environment with all dependencies (from uv.lock)
-        # poag-api-client and poag-api-server are now in uv.lock via path dependencies
+        # Note: poag-api-client and poag-api-server are added via PYTHONPATH
         poagEnv = pythonSet.mkVirtualEnv "poag-env" workspace.deps.all;
 
         # Override beads with correct Go modules hash
@@ -96,6 +94,9 @@
           ];
 
           shellHook = ''
+            # Add generated API packages to PYTHONPATH
+            export PYTHONPATH="${poag-client.packages.${system}.api-client-pkg}/${python.sitePackages}:${poag-server.packages.${system}.api-server-pkg}/${python.sitePackages}:$PYTHONPATH"
+
             export ANTHROPIC_API_KEY=$(cat ~/.anthropic-api-key 2>/dev/null || echo "")
             if [ -z "$ANTHROPIC_API_KEY" ]; then
               echo "Warning: ANTHROPIC_API_KEY not found in ~/.anthropic-api-key" >&2
@@ -131,6 +132,8 @@
             export HOME=$TMPDIR
             export PYTHONDONTWRITEBYTECODE=1
             export SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt
+            # Add generated API packages to PYTHONPATH
+            export PYTHONPATH="${poag-client.packages.${system}.api-client-pkg}/${python.sitePackages}:${poag-server.packages.${system}.api-server-pkg}/${python.sitePackages}:$PYTHONPATH"
 
             # Copy source files to build directory
             cp -r ${./.} ./poag

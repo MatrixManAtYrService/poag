@@ -305,35 +305,17 @@ wheels = [
 ]
 
 [[package]]
-name = "poag-api-client"
-version = "0.1.0"
-source = { directory = "generated/poag-api-client" }
-dependencies = [
-    { name = "certifi" },
-    { name = "pydantic" },
-    { name = "python-dateutil" },
-    { name = "six" },
-    { name = "urllib3" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "certifi", specifier = ">=2023.7.22" },
-    { name = "pydantic", specifier = ">=2.0.0" },
-    { name = "python-dateutil", specifier = ">=2.8.2" },
-    { name = "six", specifier = ">=1.10" },
-    { name = "urllib3", specifier = ">=1.25.3,<3.0.0" },
-]
-
-[[package]]
 name = "poag-client"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "certifi" },
     { name = "httpx" },
     { name = "pact-python" },
-    { name = "poag-api-client" },
     { name = "pydantic" },
+    { name = "python-dateutil" },
+    { name = "six" },
+    { name = "urllib3" },
 ]
 
 [package.optional-dependencies]
@@ -344,12 +326,15 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "certifi", specifier = ">=2023.7.22" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "pact-python", specifier = ">=3.2.1" },
-    { name = "poag-api-client", directory = "generated/poag-api-client" },
     { name = "pydantic", specifier = ">=2.10.5" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.3.4" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.24.0" },
+    { name = "python-dateutil", specifier = ">=2.8.2" },
+    { name = "six", specifier = ">=1.10" },
+    { name = "urllib3", specifier = ">=1.25.3,<3.0.0" },
 ]
 provides-extras = ["dev"]
 

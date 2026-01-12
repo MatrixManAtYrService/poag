@@ -16,13 +16,13 @@ dependencies = [
     "networkx>=3.0",  # For dependency graph analysis
     "poag-server>=0.1.0",  # Subflake: business logic with session storage
     "poag-client>=0.1.0",  # Subflake: client with session management
-    "poag-api-client>=0.1.0",  # Provided via Nix overlay
-    "poag-api-server>=0.1.0",  # Provided via Nix overlay
-    # Transitive dependencies from generated poag-api packages
+    # poag-api-client and poag-api-server are provided via Nix PYTHONPATH (not in PyPI)
+    # Transitive deps from both generated packages (from poag-api/*-pyproject.toml)
     "python-dateutil>=2.8.2",
     "urllib3>=1.25.3,<3.0.0",
     "certifi>=2023.7.22",
     "six>=1.10",
+    "starlette>=0.49.0",
     "python-multipart>=0.0.18",
     "pyyaml>=5.4.1",
     "aiofiles>=23.1.0",
